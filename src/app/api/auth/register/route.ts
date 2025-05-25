@@ -18,21 +18,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const backendResponse = await fetch(
-    `${process.env.BACKEND_URL}/auth/register`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        password,
-        name,
-        role,
-      }),
-    }
-  );
+  const backendResponse = await fetch(`http://localhost:3001/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      name,
+      role,
+    }),
+  });
 
   const responseData = await backendResponse.json();
 
