@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const body = JSON.parse(formData.get("data") as string);
-    const csvFile = formData.get("csvFile") as File | null;
+    const body = await request.json();
 
     const requiredFields = [
       "titre",
@@ -17,6 +15,7 @@ export async function POST(request: NextRequest) {
       (field) =>
         !body[field] || typeof body[field] !== "string" || !body[field].trim()
     );
+    console.log("body", body);
 
     if (missingFields.length > 0) {
       return NextResponse.json(
@@ -55,15 +54,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const payload = new FormData();
-    payload.append("data", JSON.stringify(body));
-    if (csvFile) {
-      payload.append("csvFile", csvFile);
-    }
-
     const nestjsResponse = await fetch(`http://localhost:3001/formations/add`, {
       method: "POST",
-      body: payload,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     });
 
     const nestjsData = await nestjsResponse.json();
@@ -75,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(nestjsData, { status: nestjsResponse.status });
   } catch (error) {
-    console.error("Error in /api/formations/add:", error);
+    console.error("Error in /api/formations:", error);
     if (error instanceof TypeError && error.message.includes("fetch")) {
       return NextResponse.json(
         { success: false, message: "Unable to connect to backend service" },
