@@ -27,7 +27,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const router = useRouter();
-  const checkPasswordStrength = (password: string | any) => {
+  const checkPasswordStrength = (password: string | "") => {
     let strength = 0;
     if (password.length >= 8) strength++;
     if (/[A-Z]/.test(password)) strength++;
@@ -64,7 +64,7 @@ export default function RegisterPage() {
           name,
           email,
           password,
-          role: "participant",
+          role: "formateur",
         }),
       });
 

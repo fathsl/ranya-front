@@ -53,7 +53,7 @@ const Sidebar = () => {
     >
       <div className="p-6 border-b border-gray-200">
         {!isCollapsed ? (
-          <h2 className="text-xl font-bold text-gray-800">Participant Panel</h2>
+          <h2 className="text-xl font-bold text-gray-800">Dashboard Panel</h2>
         ) : (
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">A</span>

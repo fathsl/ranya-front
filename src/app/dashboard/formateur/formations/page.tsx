@@ -62,8 +62,8 @@ const Formations = () => {
 
         const data = await response.json();
         setFormations(data);
-      } catch (error: unknown) {
-        setError(error.message);
+      } catch (error: any) {
+        setError(error.message || "Unknown error");
         console.error("Error fetching formations:", error);
       } finally {
         setLoading(false);

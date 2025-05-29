@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function PUT(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    if (!body.id) {
+    if (!body.title || !body.type || !body.formationId || !body.moduleId) {
       return NextResponse.json(
-        { success: false, message: "Formation ID is required" },
+        {
+          success: false,
+          message:
+            "Missing required fields: title, type, formationId, and moduleId are required",
+        },
         { status: 400 }
       );
     }
 
-    const nestjsResponse = await fetch(
-      `http://localhost:3001/formations/update`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }
-    );
+    const nestjsResponse = await fetch(`http://localhost:3001/resources/add`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
     const nestjsData = await nestjsResponse.json();
 
@@ -28,7 +29,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(nestjsData, { status: nestjsResponse.status });
   } catch (error) {
-    console.error("Error calling NestJS formations update controller:", error);
+    console.error("Error calling NestJS resources controller:", error);
 
     if (error instanceof TypeError && error.message.includes("fetch")) {
       return NextResponse.json(
