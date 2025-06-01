@@ -2,10 +2,14 @@
 
 import {
   CalendarIcon,
+  Edit3Icon,
   MailIcon,
   PlusIcon,
+  SaveIcon,
   SearchIcon,
+  Trash2Icon,
   UserIcon,
+  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
@@ -19,33 +23,121 @@ export interface Formateur {
   formations?: unknown[];
 }
 
+interface EditFormateurData {
+  nom: string;
+  email: string;
+}
+
 const FormateurInterface = () => {
   const [formateurs, setFormateurs] = useState<Formateur[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isEditMenuOpen, setIsEditMenuOpen] = useState(false);
+  const [selectedFormateur, setSelectedFormateur] = useState<Formateur | null>(
+    null
+  );
+  const [editData, setEditData] = useState<EditFormateurData>({
+    nom: "",
+    email: "",
+  });
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
-    const fetchFormateurs = async () => {
-      try {
-        const response = await fetch("http://localhost:3001/formateur", {
-          method: "GET",
+    fetchFormateurs();
+  }, []);
+
+  const fetchFormateurs = async () => {
+    try {
+      const response = await fetch("http://localhost:3001/formateur", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch formateurs");
+      }
+
+      const data = await response.json();
+      setFormateurs(data);
+    } catch (error) {
+      console.error("Error fetching formateurs:", error);
+    }
+  };
+
+  const handleEdit = (formateur: Formateur) => {
+    setSelectedFormateur(formateur);
+    setEditData({ nom: formateur.nom, email: formateur.email });
+    setIsEditMenuOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedFormateur) return;
+
+    setIsUpdating(true);
+    try {
+      const response = await fetch(
+        `http://localhost:3001/formateur/${selectedFormateur.id}`,
+        {
+          method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch formateurs");
+          body: JSON.stringify(editData),
         }
+      );
 
-        const data = await response.json();
-        setFormateurs(data);
-      } catch (error) {
-        console.error("Error fetching formateurs:", error);
+      if (!response.ok) {
+        throw new Error("Failed to update formateur");
       }
-    };
 
-    fetchFormateurs();
-  }, []);
+      // Update the local state
+      setFormateurs((prev) =>
+        prev.map((f) =>
+          f.id === selectedFormateur.id
+            ? { ...f, ...editData, updatedAt: new Date().toISOString() }
+            : f
+        )
+      );
+
+      setIsEditMenuOpen(false);
+      setSelectedFormateur(null);
+    } catch (error) {
+      console.error("Error updating formateur:", error);
+      alert("Erreur lors de la mise à jour du formateur");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setIsDeleting(id);
+    try {
+      const response = await fetch(`http://localhost:3001/formateur/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete formateur");
+      }
+
+      // Remove from local state
+      setFormateurs((prev) => prev.filter((f) => f.id !== id));
+      setShowDeleteConfirm(null);
+    } catch (error) {
+      console.error("Error deleting formateur:", error);
+      alert("Erreur lors de la suppression du formateur");
+    } finally {
+      setIsDeleting(null);
+    }
+  };
 
   const filteredFormateurs = formateurs.filter(
     (formateur) =>
@@ -162,50 +254,24 @@ const FormateurInterface = () => {
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-end space-x-3">
-                        <button className="text-blue-600 hover:text-blue-900 dark:text-blue-400">
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                            />
-                          </svg>
+                        <button
+                          onClick={() => handleEdit(formateur)}
+                          className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-all"
+                          title="Modifier"
+                        >
+                          <Edit3Icon size={18} />
                         </button>
-                        <button className="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400">
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                            />
-                          </svg>
-                        </button>
-                        <button className="text-red-600 hover:text-red-900 dark:text-red-400">
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
+                        <button
+                          onClick={() => setShowDeleteConfirm(formateur.id)}
+                          disabled={isDeleting === formateur.id}
+                          className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-all disabled:opacity-50"
+                          title="Supprimer"
+                        >
+                          {isDeleting === formateur.id ? (
+                            <div className="w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin"></div>
+                          ) : (
+                            <Trash2Icon size={18} />
+                          )}
                         </button>
                       </div>
                     </td>
@@ -232,6 +298,198 @@ const FormateurInterface = () => {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <Trash2Icon className="text-red-600" size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">
+                  Confirmer la suppression
+                </h3>
+                <p className="text-gray-600">Cette action est irréversible</p>
+              </div>
+            </div>
+            <p className="text-gray-700 mb-6">
+              Êtes-vous sûr de vouloir supprimer ce formateur ? Toutes ses
+              données seront perdues définitivement.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => handleDelete(showDeleteConfirm)}
+                disabled={isDeleting === showDeleteConfirm}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting === showDeleteConfirm
+                  ? "Suppression..."
+                  : "Supprimer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Slide-out Menu */}
+      <div
+        className={`fixed inset-y-0 right-0 w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
+          isEditMenuOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Modifier Formateur</h2>
+                <p className="text-blue-100 mt-1">
+                  Mettre à jour les informations
+                </p>
+              </div>
+              <button
+                onClick={() => setIsEditMenuOpen(false)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <XIcon size={24} />
+              </button>
+            </div>
+          </div>
+
+          {/* Form */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            {selectedFormateur && (
+              <div className="space-y-6">
+                {/* Avatar Section */}
+                <div className="text-center">
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4">
+                    {selectedFormateur.nom
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()}
+                  </div>
+                  <p className="text-gray-500 text-sm">
+                    ID: {selectedFormateur.id}
+                  </p>
+                </div>
+
+                {/* Form Fields */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Nom complet
+                    </label>
+                    <input
+                      type="text"
+                      value={editData.nom}
+                      onChange={(e) =>
+                        setEditData((prev) => ({
+                          ...prev,
+                          nom: e.target.value,
+                        }))
+                      }
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="Nom du formateur"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Adresse email
+                    </label>
+                    <input
+                      type="email"
+                      value={editData.email}
+                      onChange={(e) =>
+                        setEditData((prev) => ({
+                          ...prev,
+                          email: e.target.value,
+                        }))
+                      }
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="email@exemple.com"
+                    />
+                  </div>
+                </div>
+
+                {/* Info Section */}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h3 className="font-semibold text-gray-700 mb-3">
+                    Informations
+                  </h3>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Formations:</span>
+                      <span className="font-medium">
+                        {selectedFormateur.formations?.length || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Créé le:</span>
+                      <span className="font-medium">
+                        {formatDate(selectedFormateur.createdAt)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Modifié le:</span>
+                      <span className="font-medium">
+                        {formatDate(selectedFormateur.updatedAt)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-6 border-t border-gray-100">
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsEditMenuOpen(false)}
+                className="flex-1 px-4 py-3 text-gray-600 hover:text-gray-800 font-medium transition-colors border border-gray-200 rounded-xl hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleUpdate}
+                disabled={
+                  isUpdating || !editData.nom.trim() || !editData.email.trim()
+                }
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isUpdating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Mise à jour...
+                  </>
+                ) : (
+                  <>
+                    <SaveIcon size={18} />
+                    Enregistrer
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isEditMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
+          onClick={() => setIsEditMenuOpen(false)}
+        />
+      )}
     </div>
   );
 };

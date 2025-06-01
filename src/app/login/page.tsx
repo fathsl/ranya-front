@@ -48,8 +48,8 @@ export default function LoginPage() {
 
         if (data.user.role === "formateur") {
           router.push("/dashboard/formateur/dashboard");
-        } else if (data.user.role === "admin") {
-          router.push("/dashboard/admin");
+        } else if (data.user.role === "participant") {
+          router.push("/dashboard/participant/dashboard");
         } else {
           router.push("/dashboard/formateur/dashboard");
         }

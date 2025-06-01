@@ -20,6 +20,7 @@ import {
   Link2Icon,
   MailIcon,
   RocketIcon,
+  CheckIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useRouter } from "next/navigation";
@@ -779,6 +780,63 @@ const FormationCreator = () => {
     router.push("/dashboard/formateur/formations/");
   };
 
+  const saveQuizQuestions = async (
+    moduleId: string,
+    questions:
+      | { question: string; options: string[]; correctAnswer: number }[]
+      | undefined
+  ) => {
+    try {
+      if (!formationId) {
+        throw new Error("Formation ID is required");
+      }
+
+      if (!questions || questions.length === 0) {
+        throw new Error("No questions to save");
+      }
+
+      const validQuestions = questions.filter(
+        (q) =>
+          q.question &&
+          q.question.trim() &&
+          q.options &&
+          q.options.length === 4 &&
+          q.options.every((opt: string) => opt.trim()) &&
+          typeof q.correctAnswer === "number"
+      );
+
+      if (validQuestions.length === 0) {
+        throw new Error(
+          "No valid questions found. Please ensure all questions have text, 4 options, and a correct answer selected."
+        );
+      }
+
+      const response = await fetch("/api/quiz/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          formationId: formationId,
+          moduleId: moduleId,
+          questions: validQuestions,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save quiz questions");
+      }
+
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      throw error instanceof Error
+        ? error
+        : new Error("An unexpected error occurred while saving quiz questions");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="max-w-6xl mx-auto px-6 py-12">
@@ -1233,13 +1291,58 @@ const FormationCreator = () => {
                               />
                               Quiz Questions
                             </h5>
-                            <button
-                              onClick={() => addQuestion(index)}
-                              className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-all text-sm font-medium flex items-center gap-2"
-                            >
-                              <PlusIcon size={16} />
-                              Add Question
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => addQuestion(index)}
+                                className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-all text-sm font-medium flex items-center gap-2"
+                              >
+                                <PlusIcon size={16} />
+                                Add Question
+                              </button>
+                              {module.questions &&
+                                module.questions.length > 0 && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        setLoading(true);
+                                        setError(null);
+
+                                        if (!module.id) {
+                                          throw new Error(
+                                            "Module ID is required to save questions"
+                                          );
+                                        }
+
+                                        await saveQuizQuestions(
+                                          module.id,
+                                          module.questions
+                                        );
+
+                                        alert(
+                                          "Quiz questions saved successfully!"
+                                        );
+                                      } catch (error) {
+                                        console.error(
+                                          "Error saving quiz questions:",
+                                          error
+                                        );
+                                        setError(
+                                          error instanceof Error
+                                            ? error.message
+                                            : "Failed to save quiz questions"
+                                        );
+                                      } finally {
+                                        setLoading(false);
+                                      }
+                                    }}
+                                    disabled={loading}
+                                    className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <CheckIcon size={16} />
+                                    {loading ? "Saving..." : "Save Quiz"}
+                                  </button>
+                                )}
+                            </div>
                           </div>
 
                           {module.questions && module.questions.length > 0 ? (

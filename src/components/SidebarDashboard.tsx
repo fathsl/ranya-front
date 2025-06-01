@@ -1,18 +1,19 @@
+import { useAuth } from "@/contexts/authContext";
 import {
   BookOpenIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
   UserCheckIcon,
-  UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
+import { FaCertificate } from "react-icons/fa";
 
 const Sidebar = () => {
   const [isCollapsed] = useState(false);
   const [activeItem, setActiveItem] = useState("dashboard");
-
-  const menuItems = [
+  const { user } = useAuth();
+  const menuItemsFormateur = [
     {
       id: "dashboard",
       label: "Dashboard",
@@ -35,15 +36,33 @@ const Sidebar = () => {
       id: "participants",
       label: "Participants",
       icon: GraduationCapIcon,
-      href: "/dashboard/partipant/participants",
-    },
-    {
-      id: "users",
-      label: "Users",
-      icon: UsersIcon,
-      href: "/users",
+      href: "/dashboard/formateur/participants",
     },
   ];
+
+  const menuItemsParticip = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboardIcon,
+      href: "/dashboard/participant/dashboard",
+    },
+    {
+      id: "formations",
+      label: "Formations",
+      icon: BookOpenIcon,
+      href: "/dashboard/participant/formations",
+    },
+    {
+      id: "certificats",
+      label: "Certificats",
+      icon: FaCertificate,
+      href: "/dashboard/participant/certificats",
+    },
+  ];
+
+  const menuItems =
+    user?.role === "formateur" ? menuItemsFormateur : menuItemsParticip;
 
   return (
     <div
