@@ -130,7 +130,7 @@ const FormationDetailsParticipant = () => {
         setError(null);
 
         const response = await fetch(
-          `http://localhost:3001/formations/${formationId}`,
+          `http://127.0.0.1:3001/formations/${formationId}`,
           {
             method: "GET",
             headers: {
@@ -178,7 +178,7 @@ const FormationDetailsParticipant = () => {
       const updatedParticipantIds = [...currentParticipantIds, currentUser.id];
 
       const response = await fetch(
-        `http://localhost:3001/formations/${formationId}`,
+        `http://127.0.0.1:3001/formations/${formationId}`,
         {
           method: "PATCH",
           headers: {

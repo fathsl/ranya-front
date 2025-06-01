@@ -64,7 +64,7 @@ const ParticipantFormations = () => {
         setLoading(true);
         setError(null);
 
-        const response = await fetch("http://localhost:3001/formations", {
+        const response = await fetch("http://127.0.0.1:3001/formations", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

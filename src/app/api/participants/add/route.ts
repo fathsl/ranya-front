@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     console.log("Submitting user data:", { ...userData, password: "[HIDDEN]" });
 
     // Call backend API
-    const response = await fetch(`http://localhost:3001/users/add`, {
+    const response = await fetch(`http://127.0.0.1:3001/users/add`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

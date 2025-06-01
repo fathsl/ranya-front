@@ -69,7 +69,7 @@ const ParticipantInterface = () => {
   const fetchUsers = async () => {
     try {
       const response = await fetch(
-        "http://localhost:3001/users?role=participant",
+        "http://127.0.0.1:3001/users?role=participant",
         {
           method: "GET",
           headers: {
@@ -104,7 +104,7 @@ const ParticipantInterface = () => {
     setIsUpdating(true);
     try {
       const response = await fetch(
-        `http://localhost:3001/users/${selectedUser.id}`,
+        `http://127.0.0.1:3001/users/${selectedUser.id}`,
         {
           method: "PATCH",
           headers: {
@@ -142,7 +142,7 @@ const ParticipantInterface = () => {
   const handleDelete = async (id: string) => {
     setIsDeleting(id);
     try {
-      const response = await fetch(`http://localhost:3001/users/${id}`, {
+      const response = await fetch(`http://127.0.0.1:3001/users/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -261,7 +261,7 @@ const ParticipantInterface = () => {
     console.log("Request body:", requestBody); // Debug log
 
     try {
-      const response = await fetch("http://localhost:3001/certificats/add", {
+      const response = await fetch("http://127.0.0.1:3001/certificats/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

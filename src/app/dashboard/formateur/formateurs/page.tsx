@@ -51,7 +51,7 @@ const FormateurInterface = () => {
 
   const fetchFormateurs = async () => {
     try {
-      const response = await fetch("http://localhost:3001/formateur", {
+      const response = await fetch("http://127.0.0.1:3001/formateur", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -81,7 +81,7 @@ const FormateurInterface = () => {
     setIsUpdating(true);
     try {
       const response = await fetch(
-        `http://localhost:3001/formateur/${selectedFormateur.id}`,
+        `http://127.0.0.1:3001/formateur/${selectedFormateur.id}`,
         {
           method: "PUT",
           headers: {
@@ -117,7 +117,7 @@ const FormateurInterface = () => {
   const handleDelete = async (id: string) => {
     setIsDeleting(id);
     try {
-      const response = await fetch(`http://localhost:3001/formateur/${id}`, {
+      const response = await fetch(`http://127.0.0.1:3001/formateur/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

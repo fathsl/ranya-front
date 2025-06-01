@@ -63,7 +63,7 @@ const Formations = () => {
         setLoading(true);
         setError(null);
 
-        const response = await fetch("http://localhost:3001/formations", {
+        const response = await fetch("hhttp://127.0.0.1:3001/formations", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -104,7 +104,7 @@ const Formations = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:3001/formations/${formationId}`,
+        `http://127.0.0.1:3001/formations/${formationId}`,
         {
           method: "DELETE",
           headers: {

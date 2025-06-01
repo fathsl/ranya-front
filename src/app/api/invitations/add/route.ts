@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const nestjsResponse = await fetch(
-      `http://localhost:3001/invitations/add`,
+      `http://127.0.0.1:3001/invitations/add`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

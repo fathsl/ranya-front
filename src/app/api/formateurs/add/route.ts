@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     };
 
     console.log("Making request to NestJS backend...");
-    const nestjsResponse = await fetch(`http://localhost:3001/formateur/add`, {
+    const nestjsResponse = await fetch(`http://127.0.0.1:3001/formateur/add`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

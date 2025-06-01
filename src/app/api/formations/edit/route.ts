@@ -12,7 +12,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const nestjsResponse = await fetch(
-      `http://localhost:3001/formations/update`,
+      `http://127.0.0.1:3001/formations/update`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
