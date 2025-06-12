@@ -1,13 +1,15 @@
 import { useAuth } from "@/contexts/authContext";
 import {
+  AwardIcon,
   BookOpenIcon,
+  CalendarIcon,
+  FilesIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
   UserCheckIcon,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
-import { FaCertificate } from "react-icons/fa";
 
 const Sidebar = () => {
   const [isCollapsed] = useState(false);
@@ -25,6 +27,12 @@ const Sidebar = () => {
       label: "Formations",
       icon: BookOpenIcon,
       href: "/dashboard/formateur/formations",
+    },
+    {
+      id: "ressources",
+      label: "Ressources",
+      icon: FilesIcon,
+      href: "/dashboard/formateur/ressources",
     },
     {
       id: "formateurs",
@@ -54,10 +62,22 @@ const Sidebar = () => {
       href: "/dashboard/participant/formations",
     },
     {
+      id: "mesFormations",
+      label: "Mes Formations",
+      icon: BookOpenIcon,
+      href: "/dashboard/participant/mes-formations",
+    },
+    {
+      id: "calendrier",
+      label: "Calendrier",
+      icon: CalendarIcon,
+      href: "/dashboard/participant/calendrier",
+    },
+    {
       id: "certificats",
-      label: "Certificats",
-      icon: FaCertificate,
-      href: "/dashboard/participant/certificats",
+      label: "My Certificats",
+      icon: AwardIcon,
+      href: "/dashboard/participant/certificates",
     },
   ];
 

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useRouter } from "next/navigation";
+import emailjs from "@emailjs/browser";
 
 interface Formateur {
   id: string;
@@ -77,6 +78,42 @@ const StepWrapper = ({
     {children}
   </div>
 );
+
+const EMAILJS_CONFIG = {
+  serviceId: "service_43ffmwl",
+  templateId: "template_xofe4e5",
+  publicKey: "YpMpR3XZDOZCaoYmK",
+};
+
+emailjs.init(EMAILJS_CONFIG.publicKey);
+
+const sendEmailViaEmailJS = async (
+  recipientEmail: string,
+  formationName: string,
+  invitationLink: string
+) => {
+  try {
+    const templateParams = {
+      to_email: recipientEmail,
+      to_name: recipientEmail.split("@")[0],
+      formation_name: formationName,
+      invitation_link: invitationLink,
+      sender_name: "Formation Team",
+      message: `You've been invited to join ${formationName}. Click the link to accept your invitation.`,
+    };
+
+    const response = await emailjs.send(
+      EMAILJS_CONFIG.serviceId,
+      EMAILJS_CONFIG.templateId,
+      templateParams
+    );
+
+    return { success: true, response };
+  } catch (error) {
+    console.error("EmailJS error:", error);
+    return { success: false, error: error.text || error.message };
+  }
+};
 
 const FormationCreator = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -677,6 +714,89 @@ const FormationCreator = () => {
     }));
   };
 
+  const sendEmailInvitations = async () => {
+    if (!invitationData.invitationLink) {
+      const link = `${
+        window.location.origin
+      }/join-formation?token=${Math.random().toString(36).substring(2, 15)}`;
+      setInvitationData((prev) => ({
+        ...prev,
+        invitationLink: link,
+        linkGenerated: true,
+      }));
+    }
+
+    const validEmails = invitationData.emails.filter(
+      (email) => email.trim() !== "" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    );
+
+    if (validEmails.length === 0) {
+      alert("Please add at least one valid email address.");
+      return;
+    }
+
+    setIsCreatingInvitation(true);
+    const results = [];
+
+    const subject = `Invitation to join ${formData.titre || "Formation"}`;
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2563eb; margin-bottom: 16px;">You're Invited!</h2>
+        <p style="margin-bottom: 16px;">You've been invited to join the formation: <strong>${
+          formData.titre || "Formation"
+        }</strong></p>
+        <p style="margin-bottom: 20px;">Click the link below to accept your invitation:</p>
+        <a href="${invitationData.invitationLink}" 
+           style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; margin: 16px 0; font-weight: 500;">
+          Accept Invitation
+        </a>
+        <p style="color: #666; font-size: 14px; margin-top: 20px;">
+          If the button doesn't work, copy and paste this link into your browser:<br>
+          <span style="word-break: break-all;">${
+            invitationData.invitationLink
+          }</span>
+        </p>
+        <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;">
+        <p style="color: #666; font-size: 12px;">
+          This invitation was sent from ${window.location.origin}
+        </p>
+      </div>
+    `;
+
+    for (const email of validEmails) {
+      try {
+        const result = await sendEmailViaEmailJS(email, subject, htmlContent);
+
+        results.push({ email, ...result });
+      } catch (error) {
+        results.push({ email, success: false, error: error.message });
+      }
+    }
+
+    setIsCreatingInvitation(false);
+
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.length - successCount;
+
+    if (successCount > 0 && failureCount === 0) {
+      alert(`Successfully sent ${successCount} invitation(s)!`);
+    } else if (successCount > 0 && failureCount > 0) {
+      alert(
+        `Sent ${successCount} invitation(s) successfully, ${failureCount} failed.`
+      );
+      console.log(
+        "Failed emails:",
+        results.filter((r) => !r.success)
+      );
+    } else {
+      alert(
+        "Failed to send all invitations. Please check your email configuration."
+      );
+    }
+
+    console.log("Email sending results:", results);
+  };
+
   const generateLink = () => {
     const linkId = Math.random().toString(36).substring(2, 15);
     const generatedLink = `https://your-platform.com/invite/${linkId}`;
@@ -722,7 +842,7 @@ const FormationCreator = () => {
           if (!invitationData.linkGenerated) {
             // Generate a unique invitation link
             const linkId = Math.random().toString(36).substring(2, 15);
-            invitationPayload.invitationLink = `https://your-platform.com/invite/${linkId}`;
+            invitationPayload.invitationLink = `http://localhost:3000/invite/${linkId}`;
             invitationPayload.linkGenerated = true;
           } else {
             invitationPayload.invitationLink = invitationData.invitationLink;
@@ -734,9 +854,6 @@ const FormationCreator = () => {
           if (!invitationData.csvFile) {
             throw new Error("CSV file is required");
           }
-
-          // For CSV, you might need to handle file upload differently
-          // This is a simplified approach - you may need to upload the file first
           invitationPayload.csvFile = invitationData.csvFile.name;
           break;
 
@@ -759,6 +876,7 @@ const FormationCreator = () => {
       }
 
       console.log("Invitation created successfully:", result.data);
+      sendEmailInvitations();
       return true;
     } catch (error) {
       console.error("Error creating invitation:", error);
