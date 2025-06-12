@@ -3,6 +3,7 @@ import {
   AwardIcon,
   BookOpenIcon,
   CalendarIcon,
+  FileQuestionIcon,
   FilesIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
@@ -78,6 +79,12 @@ const Sidebar = () => {
       label: "My Certificats",
       icon: AwardIcon,
       href: "/dashboard/participant/certificates",
+    },
+    {
+      id: "quiz",
+      label: "Quiz",
+      icon: FileQuestionIcon,
+      href: "/dashboard/participant/quizzes",
     },
   ];
 

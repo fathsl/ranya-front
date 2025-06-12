@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useRouter } from "next/navigation";
-import emailjs from "@emailjs/browser";
 
 interface Formateur {
   id: string;
@@ -78,42 +77,6 @@ const StepWrapper = ({
     {children}
   </div>
 );
-
-const EMAILJS_CONFIG = {
-  serviceId: "service_43ffmwl",
-  templateId: "template_xofe4e5",
-  publicKey: "YpMpR3XZDOZCaoYmK",
-};
-
-emailjs.init(EMAILJS_CONFIG.publicKey);
-
-const sendEmailViaEmailJS = async (
-  recipientEmail: string,
-  formationName: string,
-  invitationLink: string
-) => {
-  try {
-    const templateParams = {
-      to_email: recipientEmail,
-      to_name: recipientEmail.split("@")[0],
-      formation_name: formationName,
-      invitation_link: invitationLink,
-      sender_name: "Formation Team",
-      message: `You've been invited to join ${formationName}. Click the link to accept your invitation.`,
-    };
-
-    const response = await emailjs.send(
-      EMAILJS_CONFIG.serviceId,
-      EMAILJS_CONFIG.templateId,
-      templateParams
-    );
-
-    return { success: true, response };
-  } catch (error) {
-    console.error("EmailJS error:", error);
-    return { success: false, error: error.text || error.message };
-  }
-};
 
 const FormationCreator = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -715,13 +678,15 @@ const FormationCreator = () => {
   };
 
   const sendEmailInvitations = async () => {
-    if (!invitationData.invitationLink) {
-      const link = `${
+    let finalLink = invitationData.invitationLink;
+    if (!finalLink) {
+      finalLink = `${
         window.location.origin
       }/join-formation?token=${Math.random().toString(36).substring(2, 15)}`;
+
       setInvitationData((prev) => ({
         ...prev,
-        invitationLink: link,
+        invitationLink: finalLink,
         linkGenerated: true,
       }));
     }
@@ -738,43 +703,36 @@ const FormationCreator = () => {
     setIsCreatingInvitation(true);
     const results = [];
 
-    const subject = `Invitation to join ${formData.titre || "Formation"}`;
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #2563eb; margin-bottom: 16px;">You're Invited!</h2>
-        <p style="margin-bottom: 16px;">You've been invited to join the formation: <strong>${
-          formData.titre || "Formation"
-        }</strong></p>
-        <p style="margin-bottom: 20px;">Click the link below to accept your invitation:</p>
-        <a href="${invitationData.invitationLink}" 
-           style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; margin: 16px 0; font-weight: 500;">
-          Accept Invitation
-        </a>
-        <p style="color: #666; font-size: 14px; margin-top: 20px;">
-          If the button doesn't work, copy and paste this link into your browser:<br>
-          <span style="word-break: break-all;">${
-            invitationData.invitationLink
-          }</span>
-        </p>
-        <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;">
-        <p style="color: #666; font-size: 12px;">
-          This invitation was sent from ${window.location.origin}
-        </p>
-      </div>
-    `;
-
     for (const email of validEmails) {
       try {
-        const result = await sendEmailViaEmailJS(email, subject, htmlContent);
+        const response = await fetch("/api/send-invitation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientEmail: email,
+            formationName: formData?.titre || "Formation",
+            invitationLink: finalLink,
+          }),
+        });
 
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Request failed");
+        }
+
+        const result = await response.json();
         results.push({ email, ...result });
       } catch (error) {
-        results.push({ email, success: false, error: error.message });
+        results.push({
+          email,
+          success: false,
+          error: error.message || "Network request failed",
+        });
       }
     }
-
     setIsCreatingInvitation(false);
 
+    // Handle results
     const successCount = results.filter((r) => r.success).length;
     const failureCount = results.length - successCount;
 
@@ -992,13 +950,48 @@ const FormationCreator = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Domain *
                   </label>
-                  <input
+                  <select
                     name="domaine"
-                    placeholder="e.g. Web Development, Marketing"
                     value={formData.domaine}
                     onChange={handleChange}
                     className={inputClass}
-                  />
+                  >
+                    <option value="">Select an IT domain</option>
+                    <option value="web-development">Web Development</option>
+                    <option value="mobile-development">
+                      Mobile Development
+                    </option>
+                    <option value="software-engineering">
+                      Software Engineering
+                    </option>
+                    <option value="data-science">Data Science</option>
+                    <option value="artificial-intelligence">
+                      Artificial Intelligence
+                    </option>
+                    <option value="machine-learning">Machine Learning</option>
+                    <option value="cybersecurity">Cybersecurity</option>
+                    <option value="cloud-computing">Cloud Computing</option>
+                    <option value="devops">DevOps</option>
+                    <option value="database-administration">
+                      Database Administration
+                    </option>
+                    <option value="network-administration">
+                      Network Administration
+                    </option>
+                    <option value="system-administration">
+                      System Administration
+                    </option>
+                    <option value="ui-ux-design">UI/UX Design</option>
+                    <option value="game-development">Game Development</option>
+                    <option value="blockchain">Blockchain</option>
+                    <option value="iot">Internet of Things (IoT)</option>
+                    <option value="quality-assurance">Quality Assurance</option>
+                    <option value="business-analysis">Business Analysis</option>
+                    <option value="project-management">
+                      IT Project Management
+                    </option>
+                    <option value="technical-writing">Technical Writing</option>
+                  </select>
                 </div>
               </div>
 
