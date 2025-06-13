@@ -26,7 +26,7 @@ const EditFormationPage = () => {
     );
   }
 
-  return <FormationCreator mode="edit" formationId={formationId} />;
+  return <FormationCreator mode="edit" formationIdEdit={formationId} />;
 };
 
 export default EditFormationPage;
