@@ -30,11 +30,12 @@ const Sidebar = () => {
       href: "/dashboard/formateur/formations",
     },
     {
-      id: "ressources",
-      label: "Ressources",
-      icon: FilesIcon,
-      href: "/dashboard/formateur/ressources",
+      id: "calendrier",
+      label: "Calendrier",
+      icon: CalendarIcon,
+      href: "/dashboard/participant/calendrier",
     },
+
     {
       id: "formateurs",
       label: "Formateurs",
@@ -69,10 +70,10 @@ const Sidebar = () => {
       href: "/dashboard/participant/mes-formations",
     },
     {
-      id: "calendrier",
-      label: "Calendrier",
-      icon: CalendarIcon,
-      href: "/dashboard/participant/calendrier",
+      id: "ressources",
+      label: "Ressources",
+      icon: FilesIcon,
+      href: "/dashboard/formateur/ressources",
     },
     {
       id: "certificats",

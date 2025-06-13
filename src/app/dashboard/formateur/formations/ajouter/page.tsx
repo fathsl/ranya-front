@@ -19,7 +19,6 @@ import {
   SaveIcon,
   Link2Icon,
   MailIcon,
-  RocketIcon,
   CheckIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
@@ -60,6 +59,12 @@ interface FormData {
   formateurId: string;
   modules: ModuleData[];
 }
+
+interface FormationCreatorProps {
+  mode?: "create" | "edit";
+  formationId?: string;
+}
+
 const StepWrapper = ({
   children,
   title,
@@ -78,11 +83,16 @@ const StepWrapper = ({
   </div>
 );
 
-const FormationCreator = () => {
+const FormationCreator = ({
+  mode = "create",
+  formationId,
+}: FormationCreatorProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formateurs, setFormateurs] = useState<Formateur[]>([]);
   const { user } = useAuth();
-  const [formationId, setFormationId] = useState<string>("");
+  const [currentFormationId, setCurrentFormationId] = useState<string>(
+    formationId || ""
+  );
   const [formData, setFormData] = useState<FormData>({
     titre: "",
     domaine: "",
@@ -207,6 +217,183 @@ const FormationCreator = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const fetchFormationData = async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch formation details
+      const formationResponse = await fetch(`/api/formations/${id}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!formationResponse.ok) {
+        throw new Error("Failed to fetch formation data");
+      }
+
+      const formationResult = await formationResponse.json();
+      const formationData = formationResult.success
+        ? formationResult.data
+        : formationResult;
+
+      // Fetch all modules and filter by formationId on frontend
+      const modulesResponse = await fetch(`/api/modules`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      let allModules = [];
+      if (modulesResponse.ok) {
+        const modulesResult = await modulesResponse.json();
+        allModules = modulesResult.success ? modulesResult.data : modulesResult;
+      }
+
+      // Filter modules by formationId
+      const modulesData = allModules.filter(
+        (module: any) => module.formationId === id
+      );
+
+      // Fetch all resources and questions once
+      const [resourcesResponse, questionsResponse] = await Promise.all([
+        fetch(`/api/resources`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }),
+        fetch(`/api/questions`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }),
+      ]);
+
+      let allResources = [];
+      let allQuestions = [];
+
+      if (resourcesResponse.ok) {
+        const resourcesResult = await resourcesResponse.json();
+        allResources = resourcesResult.success
+          ? resourcesResult.data
+          : resourcesResult;
+      }
+
+      if (questionsResponse.ok) {
+        const questionsResult = await questionsResponse.json();
+        allQuestions = questionsResult.success
+          ? questionsResult.data
+          : questionsResult;
+      }
+
+      // Build modules with their resources and questions
+      const modulesWithDetails = modulesData.map((module: any) => {
+        try {
+          // Filter resources for this module
+          const resources = allResources.filter(
+            (resource: any) => resource.moduleId === module.id
+          );
+
+          // Filter questions for this module
+          const questions = allQuestions.filter(
+            (question: any) => question.moduleId === module.id
+          );
+
+          return {
+            ...module,
+            resources: resources.map((resource: any) => ({
+              ...resource,
+              isSaved: true, // Mark as saved since they exist in DB
+            })),
+            questions: questions,
+          };
+        } catch (error) {
+          console.error(
+            `Error processing details for module ${module.id}:`,
+            error
+          );
+          return {
+            ...module,
+            resources: [],
+            questions: [],
+          };
+        }
+      });
+
+      // Fetch all invitations and filter by formationId
+      const invitationsResponse = await fetch(`/api/invitations`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      let invitationInfo = {
+        mode: "email",
+        emails: [""],
+        invitationLink: "",
+        linkGenerated: false,
+        csvFile: null as File | null,
+      };
+
+      if (invitationsResponse.ok) {
+        const invitationsResult = await invitationsResponse.json();
+        const allInvitations = invitationsResult.success
+          ? invitationsResult.data
+          : invitationsResult;
+
+        // Filter invitations by formationId
+        const invitations = allInvitations.filter(
+          (invitation: any) => invitation.formationId === id
+        );
+
+        if (invitations && invitations.length > 0) {
+          const invitation = invitations[0]; // Get the first invitation
+          invitationInfo = {
+            mode: invitation.mode || "email",
+            emails: invitation.emails || [""],
+            invitationLink: invitation.invitationLink || "",
+            linkGenerated: !!invitation.invitationLink,
+            csvFile: null,
+          };
+        }
+      }
+
+      // Update form data
+      setFormData({
+        titre: formationData.titre || "",
+        domaine: formationData.domaine || "",
+        image: formationData.image || "",
+        description: formationData.description || "",
+        objectifs: formationData.objectifs || "",
+        accessType: formationData.accessType || "public",
+        formateurId: formationData.formateurId || "",
+        modules: modulesWithDetails,
+      });
+
+      setInvitationData(invitationInfo);
+      setCurrentFormationId(id);
+    } catch (error) {
+      console.error("Error fetching formation data:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to load formation data"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mode === "edit" && formationId) {
+      fetchFormationData(formationId);
+    }
+  }, [mode, formationId]);
+
   useEffect(() => {
     const fetchFormateurs = async () => {
       try {
@@ -230,6 +417,145 @@ const FormationCreator = () => {
 
     fetchFormateurs();
   }, []);
+
+  const updateFormation = async (formData: FormData) => {
+    try {
+      const response = await fetch(`/api/formations/${currentFormationId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to update formation");
+      }
+
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      throw error instanceof Error
+        ? error
+        : new Error("An unexpected error occurred");
+    }
+  };
+
+  // Modified handleContinue to handle both create and edit modes
+  const handleContinue = async () => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      console.log(`Attempting to ${mode} formation...`);
+
+      // Validate formateur selection
+      if (!formData.formateurId) {
+        throw new Error("Please select a formateur");
+      }
+
+      // Check if selected formateur exists
+      const selectedFormateur = formateurs.find(
+        (f) => f.id === formData.formateurId
+      );
+      if (!selectedFormateur) {
+        throw new Error(
+          "Selected formateur is not valid. Please select a different formateur."
+        );
+      }
+
+      let formationId;
+      if (mode === "create") {
+        formationId = await createFormation(formData);
+        console.log("Formation created with ID:", formationId);
+        setCurrentFormationId(formationId);
+      } else {
+        await updateFormation(formData);
+        formationId = currentFormationId;
+        console.log("Formation updated with ID:", formationId);
+      }
+
+      setCurrentStep(2);
+    } catch (error) {
+      console.error(`Error in ${mode} formation:`, error);
+      setError(
+        error instanceof Error ? error.message : "An unexpected error occurred"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Enhanced addModule to handle both create and edit
+  const addModule = async () => {
+    if (!currentFormationId) {
+      setError("Formation ID is required to add modules");
+      return;
+    }
+
+    if (!currentModule.titre.trim()) {
+      setError("Module title is required");
+      return;
+    }
+
+    try {
+      setError(null);
+      setLoading(true);
+
+      const currentModules = formData.modules || [];
+
+      const newModuleData = {
+        titre: currentModule.titre,
+        formationId: currentFormationId,
+        order: currentModule.order,
+        description: currentModule.description,
+        duration: currentModule.duration,
+      };
+
+      // Create module in backend
+      const createdModule = await createModule(newModuleData);
+
+      // Add to local state with the created module data
+      setFormData((prev) => ({
+        ...prev,
+        modules: [
+          ...(prev.modules || []),
+          {
+            id: createdModule.id,
+            titre: createdModule.titre,
+            order: createdModule.order,
+            description: createdModule.description || "",
+            duration: createdModule.duration || 0,
+            resources: [],
+            questions: [],
+          },
+        ],
+      }));
+
+      // Reset current module form
+      setCurrentModule({
+        titre: "",
+        description: "",
+        duration: 0,
+        order: currentModules.length + 1,
+      });
+    } catch (error) {
+      console.error("Error adding module:", error);
+      setError(error instanceof Error ? error.message : "Failed to add module");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update handlePublish for edit mode
+  const handlePublish = async () => {
+    if (mode === "edit") {
+      // Show success message for edit
+      alert("Formation updated successfully!");
+    }
+    router.push("/dashboard/formateur/formations/");
+  };
 
   const createFormation = async (formData: unknown) => {
     try {
@@ -411,101 +737,6 @@ const FormationCreator = () => {
       throw error instanceof Error
         ? error
         : new Error("An unexpected error occurred while creating module");
-    }
-  };
-
-  const handleContinue = async () => {
-    setError(null);
-    setLoading(true);
-
-    try {
-      console.log("Attempting to create formation...");
-
-      // Validate formateur selection
-      if (!formData.formateurId) {
-        throw new Error("Please select a formateur");
-      }
-
-      // Check if selected formateur exists
-      const selectedFormateur = formateurs.find(
-        (f) => f.id === formData.formateurId
-      );
-      if (!selectedFormateur) {
-        throw new Error(
-          "Selected formateur is not valid. Please select a different formateur."
-        );
-      }
-
-      const createdFormationId = await createFormation(formData);
-      console.log("Formation created with ID:", createdFormationId);
-
-      setFormationId(createdFormationId);
-      setCurrentStep(2);
-    } catch (error) {
-      console.error("Error in handleContinue:", error);
-      setError(
-        error instanceof Error ? error.message : "An unexpected error occurred"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addModule = async () => {
-    if (!formationId) {
-      setError("Formation ID is required to add modules");
-      return;
-    }
-
-    if (!currentModule.titre.trim()) {
-      setError("Module title is required");
-      return;
-    }
-
-    try {
-      setError(null);
-      setLoading(true);
-
-      const currentModules = formData.modules || [];
-
-      const newModuleData = {
-        titre: currentModule.titre,
-        formationId: formationId,
-        order: currentModule.order,
-        description: currentModule.description,
-        duration: currentModule.duration,
-      };
-
-      // Create module in backend
-      const createdModule = await createModule(newModuleData);
-
-      // Add to local state with the created module data
-      setFormData((prev) => ({
-        ...prev,
-        modules: [
-          ...(prev.modules || []),
-          {
-            id: createdModule.id,
-            titre: createdModule.titre,
-            order: createdModule.order,
-            description: createdModule.description || "",
-            duration: createdModule.duration || 0,
-          },
-        ],
-      }));
-
-      // Reset current module form
-      setCurrentModule({
-        titre: "",
-        description: "",
-        duration: 0,
-        order: currentModules.length + 1,
-      });
-    } catch (error) {
-      console.error("Error adding module:", error);
-      setError(error instanceof Error ? error.message : "Failed to add module");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -852,10 +1083,6 @@ const FormationCreator = () => {
     }
   };
 
-  const handlePublish = async () => {
-    router.push("/dashboard/formateur/formations/");
-  };
-
   const saveQuizQuestions = async (
     moduleId: string,
     questions:
@@ -912,16 +1139,29 @@ const FormationCreator = () => {
         : new Error("An unexpected error occurred while saving quiz questions");
     }
   };
+  if (loading && mode === "edit") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading formation data...</p>
+        </div>
+      </div>
+    );
+  }
 
+  const pageTitle = mode === "edit" ? "Edit Formation" : "Create New Formation";
+  const submitButtonText =
+    mode === "edit" ? "Update Formation" : "Publish Formation";
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-            Create New Formation
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">{pageTitle}</h1>
           <p className="text-gray-600 text-lg">
-            Build engaging learning experiences step by step
+            {mode === "edit"
+              ? "Update your formation details, modules, and settings"
+              : "Build engaging learning experiences step by step"}
           </p>
         </div>
 
@@ -1819,121 +2059,27 @@ const FormationCreator = () => {
         {currentStep === 4 && (
           <StepWrapper
             title="Review & Publish"
-            subtitle="Final check before launching your formation"
+            subtitle="Review your formation before publishing"
           >
-            <div className="space-y-8">
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-xl border border-blue-200">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                  Formation Summary
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-semibold text-gray-700">Title:</span>
-                    <p className="text-gray-600">
-                      {formData.titre || "Not specified"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Domain:</span>
-                    <p className="text-gray-600">
-                      {formData.domaine || "Not specified"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">
-                      Access Type:
-                    </span>
-                    <p className="text-gray-600 capitalize">
-                      {formData.accessType}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">
-                      Modules:
-                    </span>
-                    <p className="text-gray-600">
-                      {formData.modules.length} module(s)
-                    </p>
-                  </div>
-                </div>
-                {formData.description && (
-                  <div className="mt-4">
-                    <span className="font-semibold text-gray-700">
-                      Description:
-                    </span>
-                    <p className="text-gray-600 mt-1">{formData.description}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl">
-                <h4 className="font-semibold text-amber-800 mb-3 flex items-center gap-2">
-                  <Check size={20} /> Pre-publication Checklist
-                </h4>
-                <ul className="space-y-2 text-sm text-amber-700">
-                  <li className="flex items-center gap-2">
-                    <Check size={16} className="text-amber-600" />
-                    All modules have titles and content
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check size={16} className="text-amber-600" />
-                    Resource URLs are valid and accessible
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check size={16} className="text-amber-600" />
-                    Access settings are configured correctly
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check size={16} className="text-amber-600" />
-                    Formation details are complete and accurate
-                  </li>
-                </ul>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border-2 border-gray-200">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-1 w-5 h-5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <div>
-                    <span className="font-medium text-gray-800">
-                      I confirm that all information is correct and I want to
-                      publish this formation
-                    </span>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Once published, participants will be able to access the
-                      formation according to your access settings.
-                    </p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-between mt-8">
+            <div className="flex gap-4 pt-6">
               <button
                 onClick={() => setCurrentStep(3)}
-                className={`${buttonClass} bg-gray-500 hover:bg-gray-600 text-white`}
+                className={`${buttonClass} bg-gray-100 text-gray-700 hover:bg-gray-200`}
               >
-                <ArrowLeftIcon size={20} /> Previous
+                <ArrowLeftIcon size={20} />
+                Back
               </button>
               <button
                 onClick={handlePublish}
                 disabled={isSubmitting}
-                className={`${buttonClass} ${
-                  isSubmitting
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl"
-                } text-white px-8`}
+                className={`${buttonClass} bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 flex-1`}
               >
                 {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Publishing...
-                  </>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 ) : (
                   <>
-                    <RocketIcon size={20} /> Publish Formation
+                    <CheckCircleIcon size={20} />
+                    {submitButtonText}
                   </>
                 )}
               </button>

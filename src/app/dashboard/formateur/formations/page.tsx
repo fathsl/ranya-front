@@ -9,6 +9,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 export interface ModuleEntity {
@@ -56,7 +57,7 @@ const Formations = () => {
   const [formations, setFormations] = useState<Formation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const router = useRouter();
   useEffect(() => {
     const fetchFormations = async () => {
       try {
@@ -88,9 +89,7 @@ const Formations = () => {
   }, []);
 
   const handleEdit = (formationId: string) => {
-    console.log("Edit formation:", formationId);
-    // Navigate to edit page or open edit modal
-    // window.location.href = `/dashboard/formateur/formations/edit/${formationId}`;
+    router.push(`/dashboard/formateur/formations/edit/${formationId}`);
   };
 
   const handleDelete = async (formationId: string) => {
@@ -267,13 +266,13 @@ const Formations = () => {
 
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <button
+                  {/* <button
                     onClick={() => handleView(formation.id)}
                     className="flex items-center gap-1 text-gray-600 hover:text-blue-600 transition-colors duration-200"
                   >
                     <EyeIcon size={16} />
                     <span className="text-sm">Voir</span>
-                  </button>
+                  </button> */}
 
                   <div className="flex items-center gap-2">
                     <button

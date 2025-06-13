@@ -6,8 +6,11 @@ import {
   CalendarIcon,
   CheckCircleIcon,
   ClockIcon,
+  FileIcon,
   FileTextIcon,
+  ImageIcon,
   PlayCircleIcon,
+  PlayIcon,
   TargetIcon,
   UserIcon,
   UsersIcon,
@@ -116,6 +119,7 @@ const FormationDetailsParticipant = () => {
   const [enrolling, setEnrolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const [expandedResources, setExpandedResources] = useState(new Set());
 
   const currentUser = {
     id: user?.id,
@@ -214,21 +218,21 @@ const FormationDetailsParticipant = () => {
   const getResourceIcon = (type: string) => {
     switch (type) {
       case "video":
-        return <PlayCircleIcon size={16} className="text-red-500" />;
+        return <PlayIcon size={20} className="text-red-500" />;
+      case "image":
+        return <ImageIcon size={20} className="text-blue-500" />;
       case "pdf":
-        return <FileTextIcon size={16} className="text-blue-500" />;
-      case "text":
-        return <FileTextIcon size={16} className="text-green-500" />;
+        return <FileTextIcon size={20} className="text-red-600" />;
       default:
-        return <FileTextIcon size={16} className="text-gray-500" />;
+        return <FileIcon size={20} className="text-gray-500" />;
     }
   };
 
   const getTotalDuration = () => {
     if (!formation?.modules) return 0;
-    return formation.modules.reduce((total, module) => {
+    return formation.modules.reduce((total) => {
       const moduleDuration =
-        module.resources?.reduce((sum, resource) => {
+        formation.modules?.reduce((sum, resource) => {
           return sum + (resource.duration || 0);
         }, 0) || 0;
       return total + moduleDuration;
@@ -239,6 +243,127 @@ const FormationDetailsParticipant = () => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+  };
+
+  const getYouTubeEmbedUrl = (url: string) => {
+    if (!url || typeof url !== "string") {
+      return "";
+    }
+
+    const regExp =
+      /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+
+    if (match && match[2].length === 11) {
+      return `https://www.youtube.com/embed/${match[2]}`;
+    }
+
+    return url;
+  };
+
+  const isYouTubeUrl = (url: string) => {
+    if (!url || typeof url !== "string") {
+      return false;
+    }
+    return url.includes("youtube.com") || url.includes("youtu.be");
+  };
+
+  const toggleResourceExpansion = (resourceId) => {
+    const newExpanded = new Set(expandedResources);
+    if (newExpanded.has(resourceId)) {
+      newExpanded.delete(resourceId);
+    } else {
+      newExpanded.add(resourceId);
+    }
+    setExpandedResources(newExpanded);
+  };
+
+  const renderResourceContent = (resource) => {
+    const isExpanded = expandedResources.has(resource.id);
+
+    if (!isExpanded) return null;
+
+    switch (resource.type) {
+      case "image":
+        return (
+          <div className="mt-3 p-3 bg-white rounded-lg border">
+            <img
+              src={resource.url}
+              alt={resource.title}
+              className="max-w-full h-auto rounded-lg shadow-sm"
+              onError={(e) => {
+                e.target.src =
+                  "https://via.placeholder.com/600x400/CCCCCC/666666?text=Image+non+disponible";
+              }}
+            />
+          </div>
+        );
+
+      case "video":
+        return (
+          <div className="mt-3 p-3 bg-white rounded-lg border">
+            {resource.url && isYouTubeUrl(resource.url) ? (
+              <div
+                className="relative w-full"
+                style={{ paddingBottom: "56.25%" }}
+              >
+                <iframe
+                  src={getYouTubeEmbedUrl(resource.url)}
+                  className="absolute top-0 left-0 w-full h-full rounded-lg"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title={resource.title}
+                />
+              </div>
+            ) : resource.url ? (
+              <video
+                controls
+                className="w-full max-w-2xl rounded-lg shadow-sm"
+                preload="metadata"
+              >
+                <source src={resource.url} type="video/mp4" />
+                Votre navigateur ne supporte pas la lecture vidéo.
+              </video>
+            ) : (
+              <div className="p-4 bg-gray-100 rounded-lg text-center text-gray-600">
+                URL de la vidéo non disponible
+              </div>
+            )}
+          </div>
+        );
+
+      case "pdf":
+        return (
+          <div className="mt-3 p-3 bg-white rounded-lg border">
+            <iframe
+              src={resource.url}
+              className="w-full h-96 rounded-lg border"
+              title={resource.title}
+            />
+            <div className="mt-2 text-center">
+              <a
+                href={resource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <FileTextIcon size={16} />
+                Ouvrir le PDF dans un nouvel onglet
+              </a>
+            </div>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="mt-3 p-3 bg-gray-100 rounded-lg border">
+            <p className="text-gray-600">
+              Type de ressource non pris en charge: {resource.type}
+            </p>
+          </div>
+        );
+    }
   };
 
   if (loading) {
@@ -386,10 +511,10 @@ const FormationDetailsParticipant = () => {
                   .map((module, index) => (
                     <div
                       key={module.id}
-                      className="border border-gray-200 rounded-lg p-5"
+                      className="border border-gray-200 rounded-lg p-5 bg-white shadow-sm"
                     >
                       <div className="flex items-start gap-4">
-                        <div className="bg-green-100 text-green-800 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
+                        <div className="bg-green-100 text-green-800 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
                           {index + 1}
                         </div>
                         <div className="flex-1">
@@ -403,36 +528,47 @@ const FormationDetailsParticipant = () => {
                           )}
 
                           {module.resources && module.resources.length > 0 && (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                               <h4 className="font-medium text-gray-700 mb-2">
                                 Ressources:
                               </h4>
                               {module.resources
                                 .sort((a, b) => a.order - b.order)
                                 .map((resource) => (
-                                  <div
-                                    key={resource.id}
-                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                                  >
-                                    {getResourceIcon(resource.type)}
-                                    <div className="flex-1">
-                                      <p className="font-medium text-gray-800">
-                                        {resource.title}
-                                      </p>
-                                      {resource.description && (
-                                        <p className="text-sm text-gray-600">
-                                          {resource.description}
+                                  <div key={resource.id} className="space-y-2">
+                                    <div
+                                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                                      onClick={() =>
+                                        toggleResourceExpansion(resource.id)
+                                      }
+                                    >
+                                      {getResourceIcon(resource.type)}
+                                      <div className="flex-1">
+                                        <p className="font-medium text-gray-800">
+                                          {resource.title}
                                         </p>
-                                      )}
-                                    </div>
-                                    {resource.duration && (
-                                      <div className="flex items-center gap-1 text-gray-500">
-                                        <ClockIcon size={14} />
-                                        <span className="text-sm">
-                                          {formatDuration(resource.duration)}
-                                        </span>
+                                        {resource.description && (
+                                          <p className="text-sm text-gray-600">
+                                            {resource.description}
+                                          </p>
+                                        )}
                                       </div>
-                                    )}
+                                      {resource.duration && (
+                                        <div className="flex items-center gap-1 text-gray-500">
+                                          <ClockIcon size={14} />
+                                          <span className="text-sm">
+                                            {formatDuration(resource.duration)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <div className="text-gray-400">
+                                        {expandedResources.has(resource.id)
+                                          ? "▼"
+                                          : "▶"}
+                                      </div>
+                                    </div>
+
+                                    {renderResourceContent(resource)}
                                   </div>
                                 ))}
                             </div>
