@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 
-const GMAIL_USER = "fatta712a@gmail.com";
-const GMAIL_PASS = "trgn yxrp shrw qafi";
+const GMAIL_USER = "ranyaknani39@gmail.com";
+const GMAIL_PASS = "lusk tjrz locf pnmm";
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",

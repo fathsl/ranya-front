@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const backendResponse = await fetch(
-      `${process.env.BACKEND_URL}/modules/add`,
+      `http://localhost:3001/modules/add`,
       {
         method: "POST",
         headers: {
