@@ -9,12 +9,14 @@ export async function POST(request: NextRequest) {
       "domaine",
       "description",
       "objectifs",
-      "formateurId",
+      "userId",
     ];
+
     const missingFields = requiredFields.filter(
       (field) =>
         !body[field] || typeof body[field] !== "string" || !body[field].trim()
     );
+
     console.log("body", body);
 
     if (missingFields.length > 0) {
@@ -29,6 +31,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate invitation data if provided
     if (body.invitation) {
       if (!body.invitation.mode) {
         return NextResponse.json(
@@ -54,12 +57,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Prepare the data to send to NestJS backend
+    const formationData = {
+      ...body,
+      // Ensure image field is included even if empty
+      image: body.image || null,
+    };
+
     const nestjsResponse = await fetch(`http://127.0.0.1:3001/formations/add`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(formationData),
     });
 
     const nestjsData = await nestjsResponse.json();

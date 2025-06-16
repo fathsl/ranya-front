@@ -3,7 +3,6 @@
 import {
   BookOpenIcon,
   Edit3Icon,
-  EyeIcon,
   PlusIcon,
   Trash2Icon,
   UsersIcon,
@@ -17,10 +16,10 @@ export interface ModuleEntity {
   titre?: string;
   name?: string;
 }
-
-export interface Formateur {
+interface User {
   id: string;
-  nom: string;
+  name: string;
+  role: string;
   email?: string;
 }
 
@@ -45,8 +44,8 @@ export interface Formation {
     linkGenerated: boolean;
     csvFile?: unknown;
   };
-  formateur: Formateur;
-  formateurId: string;
+  user: User;
+  userId: string;
   modules: ModuleEntity[];
   participants: Participant[];
   createdAt: string | Date;
@@ -124,10 +123,18 @@ const Formations = () => {
     }
   };
 
-  const handleView = (formationId: string) => {
-    console.log("View formation:", formationId);
-    // Navigate to view page
-    // window.location.href = `/dashboard/formateur/formations/${formationId}`;
+  const handleViewParticipants = (formationId: string) => {
+    router.push(`/dashboard/formateur/formations/participants/${formationId}`);
+  };
+
+  const getImageUrl = (imageName: string | null | undefined) => {
+    if (!imageName) return null;
+
+    if (imageName.startsWith("http") || imageName.startsWith("/uploads/")) {
+      return imageName;
+    }
+
+    return `/uploads/${imageName}`;
   };
 
   if (loading) {
@@ -189,7 +196,9 @@ const Formations = () => {
                 className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden"
                 style={{
                   backgroundImage: formation.image
-                    ? `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${formation.image})`
+                    ? `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${getImageUrl(
+                        formation.image
+                      )})`
                     : undefined,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
@@ -201,20 +210,20 @@ const Formations = () => {
                     {formation.titre}
                   </h3>
                   <p className="text-white/90 text-sm">
-                    Par {formation.formateur.nom}
+                    Par {formation.user.name}
                   </p>
                 </div>
 
                 {/* Status Badge */}
                 <div className="absolute top-4 right-4">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      formation.archived
-                        ? "bg-red-500 text-white"
-                        : "bg-green-500 text-white"
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      formation.accessType === "private"
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-green-100 text-green-800"
                     }`}
                   >
-                    {formation.archived ? "Archivé" : "Actif"}
+                    {formation.accessType === "private" ? "Privé" : "Public"}
                   </span>
                 </div>
               </div>
@@ -251,28 +260,15 @@ const Formations = () => {
                   </div>
                 </div>
 
-                {/* Access Type */}
-                <div className="mb-4">
-                  <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      formation.accessType === "private"
-                        ? "bg-blue-100 text-blue-800"
-                        : "bg-green-100 text-green-800"
-                    }`}
-                  >
-                    {formation.accessType === "private" ? "Privé" : "Public"}
-                  </span>
-                </div>
-
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  {/* <button
-                    onClick={() => handleView(formation.id)}
+                  <button
+                    onClick={() => handleViewParticipants(formation.id)}
                     className="flex items-center gap-1 text-gray-600 hover:text-blue-600 transition-colors duration-200"
                   >
-                    <EyeIcon size={16} />
-                    <span className="text-sm">Voir</span>
-                  </button> */}
+                    <UsersIcon size={16} />
+                    <span className="text-sm">Participants</span>
+                  </button>
 
                   <div className="flex items-center gap-2">
                     <button

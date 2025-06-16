@@ -7,7 +7,6 @@ import {
   BookOpen,
   Settings,
   Eye,
-  Upload,
   Type,
   Trash2Icon,
   PlusIcon,
@@ -20,14 +19,16 @@ import {
   Link2Icon,
   MailIcon,
   CheckIcon,
-  RocketIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useRouter } from "next/navigation";
+import ImageUpload from "@/components/ImageUpload";
 
-interface Formateur {
+interface User {
   id: string;
-  nom: string;
+  name: string;
+  role: string;
+  email?: string;
 }
 
 interface ModuleData {
@@ -57,7 +58,7 @@ interface FormData {
   description: string;
   objectifs: string;
   accessType: string;
-  formateurId: string;
+  userId: string;
   modules: ModuleData[];
 }
 
@@ -89,7 +90,7 @@ const FormationCreator = ({
   formationIdEdit,
 }: FormationCreatorProps) => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [formateurs, setFormateurs] = useState<Formateur[]>([]);
+  const [formateurs, setFormateurs] = useState<User[]>([]);
   const { user } = useAuth();
   const [formationId, setFormationId] = useState<string>("");
   const [currentFormationId, setCurrentFormationId] = useState<string>(
@@ -102,7 +103,7 @@ const FormationCreator = ({
     description: "",
     objectifs: "",
     accessType: "public",
-    formateurId: user?.role === "formateur" ? user.id : "",
+    userId: user?.role === "formateur" ? user.id : "",
     modules: [],
   });
   const [invitationData, setInvitationData] = useState({
@@ -124,6 +125,7 @@ const FormationCreator = ({
   const [savingResource, setSavingResource] = useState<string | null>(null);
   const [isCreatingInvitation, setIsCreatingInvitation] = useState(false);
   const [isSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
 
   const steps = [
@@ -260,15 +262,15 @@ const FormationCreator = ({
         (module: any) => module.formationId === id
       );
 
-      // Fetch all resources and questions once
-      const [resourcesResponse, questionsResponse] = await Promise.all([
+      // Fetch all resources and quizzes once
+      const [resourcesResponse, quizzesResponse] = await Promise.all([
         fetch(`http://127.0.0.1:3001/resources/`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
           },
         }),
-        fetch(`http://localhost:3001/quizzes`, {
+        fetch(`http://127.0.0.1:3001/quizzes`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -277,7 +279,7 @@ const FormationCreator = ({
       ]);
 
       let allResources = [];
-      let allQuestions = [];
+      let allQuizzes = [];
 
       if (resourcesResponse.ok) {
         const resourcesResult = await resourcesResponse.json();
@@ -286,31 +288,51 @@ const FormationCreator = ({
           : resourcesResult;
       }
 
-      if (questionsResponse.ok) {
-        const questionsResult = await questionsResponse.json();
-        allQuestions = questionsResult.success
-          ? questionsResult.data
-          : questionsResult;
+      if (quizzesResponse.ok) {
+        const quizzesResult = await quizzesResponse.json();
+        allQuizzes = quizzesResult.success ? quizzesResult.data : quizzesResult;
       }
 
-      // Build modules with their resources and questions
       const modulesWithDetails = modulesData.map((module: any) => {
         try {
-          // Filter resources for this module
           const resources = allResources.filter(
             (resource: any) => resource.moduleId === module.id
           );
 
-          // Filter questions for this module
-          const questions = allQuestions.filter(
-            (question: any) => question.moduleId === module.id
+          const moduleQuizzes = allQuizzes.filter(
+            (quiz: any) => quiz.moduleId === module.id
           );
+
+          const questions = moduleQuizzes.reduce(
+            (allQuestions: any[], quiz: any) => {
+              if (quiz.questions && Array.isArray(quiz.questions)) {
+                const quizQuestions = quiz.questions.map((question: any) => ({
+                  id: question.id,
+                  question: question.question || "",
+                  options: Array.isArray(question.options)
+                    ? question.options
+                    : ["", "", "", ""],
+                  correctAnswer: question.correctAnswer || 0,
+                  quizId: quiz.id,
+                  moduleId: module.id,
+                  order: question.order || 0,
+                }));
+                return [...allQuestions, ...quizQuestions];
+              }
+              return allQuestions;
+            },
+            []
+          );
+
+          questions.sort((a: any, b: any) => a.order - b.order);
+
+          console.log(`Questions for module ${module.id}:`, questions);
 
           return {
             ...module,
             resources: resources.map((resource: any) => ({
               ...resource,
-              isSaved: true, // Mark as saved since they exist in DB
+              isSaved: true,
             })),
             questions: questions,
           };
@@ -327,7 +349,9 @@ const FormationCreator = ({
         }
       });
 
-      // Fetch all invitations and filter by formationId
+      // Debug: Log final modules with
+      console.log("Modules with details:", modulesWithDetails);
+
       const invitationsResponse = await fetch(
         `http://127.0.0.1:3001/invitations`,
         {
@@ -352,13 +376,12 @@ const FormationCreator = ({
           ? invitationsResult.data
           : invitationsResult;
 
-        // Filter invitations by formationId
         const invitations = allInvitations.filter(
           (invitation: any) => invitation.formationId === id
         );
 
         if (invitations && invitations.length > 0) {
-          const invitation = invitations[0]; // Get the first invitation
+          const invitation = invitations[0];
           invitationInfo = {
             mode: invitation.mode || "email",
             emails: invitation.emails || [""],
@@ -369,7 +392,6 @@ const FormationCreator = ({
         }
       }
 
-      // Update form data
       setFormData({
         titre: formationData.titre || "",
         domaine: formationData.domaine || "",
@@ -377,7 +399,7 @@ const FormationCreator = ({
         description: formationData.description || "",
         objectifs: formationData.objectifs || "",
         accessType: formationData.accessType || "public",
-        formateurId: formationData.formateurId || "",
+        userId: formationData.userId || "",
         modules: modulesWithDetails,
       });
 
@@ -393,7 +415,6 @@ const FormationCreator = ({
     }
   };
 
-  // Fixed useEffect - use formationIdEdit for edit mode
   useEffect(() => {
     if (mode === "edit" && formationIdEdit) {
       fetchFormationData(formationIdEdit);
@@ -401,9 +422,18 @@ const FormationCreator = ({
   }, [mode, formationIdEdit]);
 
   useEffect(() => {
+    if (user?.role === "formateur" && user?.id) {
+      setFormData((prev) => ({
+        ...prev,
+        userId: user.id,
+      }));
+    }
+  }, [user]);
+
+  useEffect(() => {
     const fetchFormateurs = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:3001/formateur", {
+        const response = await fetch("http://127.0.0.1:3001/users", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -416,6 +446,7 @@ const FormationCreator = ({
 
         const data = await response.json();
         setFormateurs(data);
+        console.log("Fetched formateurs:", data);
       } catch (error) {
         console.error("Error fetching formateurs:", error);
       }
@@ -424,14 +455,48 @@ const FormationCreator = ({
     fetchFormateurs();
   }, []);
 
+  const handleImageChange = (file: File | null) => {
+    setImageFile(file);
+    if (file) {
+      const fileName = `${Date.now()}_${file.name}`;
+      setFormData((prev) => ({ ...prev, image: fileName }));
+    } else {
+      setFormData((prev) => ({ ...prev, image: "" }));
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const response = await fetch("/api/upload/image", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to upload image");
+    }
+
+    const result = await response.json();
+    return result.filename;
+  };
+
   const updateFormation = async (formData: FormData) => {
     try {
+      const finalFormData = { ...formData };
+
+      if (imageFile) {
+        const filename = await uploadImage(imageFile);
+        finalFormData.image = filename;
+      }
+
       const response = await fetch(`/api/formations/${currentFormationId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(finalFormData),
       });
 
       if (!response.ok) {
@@ -448,41 +513,42 @@ const FormationCreator = ({
     }
   };
 
-  // Modified handleContinue to handle both create and edit modes
   const handleContinue = async () => {
     setError(null);
     setLoading(true);
 
     try {
-      console.log(`Attempting to ${mode} formation...`);
+      console.log("Form data before validation:", formData);
 
-      // Validate formateur selection
-      if (!formData.formateurId) {
+      if (!formData.userId) {
         throw new Error("Please select a formateur");
       }
 
-      // Check if selected formateur exists
-      const selectedFormateur = formateurs.find(
-        (f) => f.id === formData.formateurId
-      );
-      if (!selectedFormateur) {
-        throw new Error(
-          "Selected formateur is not valid. Please select a different formateur."
-        );
+      if (user?.role !== "formateur") {
+        const selectedUser = formateurs.find((f) => f.id === formData.userId);
+        if (!selectedUser) {
+          throw new Error(
+            "Selected formateur is not valid. Please select a different formateur."
+          );
+        }
+        if (selectedUser.role !== "formateur") {
+          throw new Error(
+            "Selected user is not a formateur. Please select a valid formateur."
+          );
+        }
       }
 
       let formationIdToUse;
       if (mode === "create") {
         formationIdToUse = await createFormation(formData);
         console.log("Formation created with ID:", formationIdToUse);
-        setFormationId(formationIdToUse); // Set the formationId state
+        setFormationId(formationIdToUse);
         setCurrentFormationId(formationIdToUse);
       } else {
         await updateFormation(formData);
         formationIdToUse = currentFormationId;
         console.log("Formation updated with ID:", formationIdToUse);
       }
-
       setCurrentStep(2);
     } catch (error) {
       console.error(`Error in ${mode} formation:`, error);
@@ -494,7 +560,6 @@ const FormationCreator = ({
     }
   };
 
-  // Enhanced addModule to handle both create and edit
   const addModule = async () => {
     if (!currentFormationId) {
       setError("Formation ID is required to add modules");
@@ -555,7 +620,6 @@ const FormationCreator = ({
     }
   };
 
-  // Update handlePublish for edit mode
   const handlePublish = async () => {
     if (mode === "edit") {
       // Show success message for edit
@@ -564,14 +628,22 @@ const FormationCreator = ({
     router.push("/dashboard/formateur/formations/");
   };
 
-  const createFormation = async (formData: unknown) => {
+  const createFormation = async (formData: FormData) => {
     try {
+      const finalFormData = { ...formData };
+
+      // Upload image if one is selected
+      if (imageFile) {
+        const filename = await uploadImage(imageFile);
+        finalFormData.image = filename;
+      }
+
       const response = await fetch("/api/formations/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(finalFormData),
       });
 
       if (!response.ok) {
@@ -689,11 +761,11 @@ const FormationCreator = ({
       case 1:
         return (
           formData.titre.trim() &&
-          formData.domaine.trim() &&
-          formData.description.trim() &&
-          formData.objectifs.trim() &&
-          formData.accessType &&
-          formData.formateurId &&
+            formData.domaine.trim() &&
+            formData.description.trim() &&
+            formData.objectifs.trim() &&
+            formData.accessType &&
+            formData.userId.trim() !== "",
           !loading
         );
       case 2:
@@ -1093,6 +1165,13 @@ const FormationCreator = ({
     }
   };
 
+  const getCurrentImageUrl = () => {
+    if (formData.image && mode === "edit") {
+      return `/uploads/${formData.image}`;
+    }
+    return undefined;
+  };
+
   const saveQuizQuestions = async (
     moduleId: string,
     questions:
@@ -1251,46 +1330,47 @@ const FormationCreator = ({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Cover Image URL
-                </label>
-                <div className="relative">
-                  <input
-                    name="image"
-                    placeholder="https://example.com/image.jpg"
-                    value={formData.image}
-                    onChange={handleChange}
-                    className={inputClass}
-                  />
-                  <Upload
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-                    size={20}
-                  />
-                </div>
+                <ImageUpload
+                  label="Cover Image"
+                  currentImage={getCurrentImageUrl()}
+                  onImageChange={handleImageChange}
+                  className="mb-4"
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Formateur *
                 </label>
-                <select
-                  name="formateurId"
-                  value={formData.formateurId || ""}
-                  onChange={handleChange}
-                  className={`${inputClass} cursor-pointer`}
-                  // disabled={user?.role === "formateur"}
-                >
-                  <option value="" disabled>
-                    Select a formateur
-                  </option>
-                  {formateurs.map((formateur) => (
-                    <option key={formateur.id} value={formateur.id}>
-                      {formateur.nom}
+                {user?.role === "formateur" ? (
+                  <input
+                    type="text"
+                    name="userId"
+                    value={user.name}
+                    readOnly
+                    className={`${inputClass} bg-gray-100 cursor-not-allowed`}
+                    style={{ backgroundColor: "#f9fafb" }}
+                  />
+                ) : (
+                  <select
+                    name="userId"
+                    value={formData.userId || ""}
+                    onChange={handleChange}
+                    className={`${inputClass} cursor-pointer`}
+                  >
+                    <option value="" disabled>
+                      Select a formateur
                     </option>
-                  ))}
-                </select>
+                    {formateurs
+                      .filter((formateur) => formateur.role === "formateur")
+                      .map((formateur) => (
+                        <option key={formateur.id} value={formateur.id}>
+                          {formateur.name}
+                        </option>
+                      ))}
+                  </select>
+                )}
               </div>
-
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Description *
