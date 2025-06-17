@@ -305,13 +305,6 @@ const Formations = () => {
             <p className="text-gray-500 mb-6">
               Commencez par créer votre première formation
             </p>
-            <button
-              onClick={() => console.log("Navigate to add formation")}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl mx-auto"
-            >
-              <PlusIcon size={20} />
-              <span className="font-semibold">Créer une Formation</span>
-            </button>
           </div>
         )}
       </div>

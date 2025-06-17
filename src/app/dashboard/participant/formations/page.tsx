@@ -11,12 +11,12 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-interface Formateur {
+interface User {
   id: string;
-  nom: string;
-  email: string;
+  name: string;
+  role: string;
+  email?: string;
 }
-
 interface ModuleEntity {
   id: string;
   titre: string;
@@ -27,7 +27,7 @@ interface Participant {
   nom: string;
 }
 
-interface Formation {
+export interface Formation {
   id: string;
   titre: string;
   domaine: string;
@@ -42,14 +42,13 @@ interface Formation {
     linkGenerated: boolean;
     csvFile?: unknown;
   };
-  formateur: Formateur;
-  formateurId: string;
+  user: User;
+  userId: string;
   modules: ModuleEntity[];
   participants: Participant[];
   createdAt: string | Date;
   updatedAt: string | Date;
 }
-
 const ParticipantFormations = () => {
   const { user } = useAuth();
   const [formations, setFormations] = useState<Formation[]>([]);
@@ -121,9 +120,7 @@ const ParticipantFormations = () => {
           formation.description
             .toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
-          formation.formateur.nom
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())
+          formation.user.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -138,6 +135,16 @@ const ParticipantFormations = () => {
 
   // Get unique domains for filter
   const uniqueDomains = Array.from(new Set(formations.map((f) => f.domaine)));
+
+  const getImageUrl = (imageName: string | null | undefined) => {
+    if (!imageName) return null;
+
+    if (imageName.startsWith("http") || imageName.startsWith("/uploads/")) {
+      return imageName;
+    }
+
+    return `/uploads/${imageName}`;
+  };
 
   if (loading) {
     return (
@@ -228,10 +235,12 @@ const ParticipantFormations = () => {
             >
               {/* Card Header with Image */}
               <div
-                className="h-48 bg-gradient-to-br from-green-500 to-blue-600 relative overflow-hidden"
+                className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden"
                 style={{
                   backgroundImage: formation.image
-                    ? `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${formation.image})`
+                    ? `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${getImageUrl(
+                        formation.image
+                      )})`
                     : undefined,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
@@ -243,7 +252,7 @@ const ParticipantFormations = () => {
                     {formation.titre}
                   </h3>
                   <p className="text-white/90 text-sm">
-                    Par {formation.formateur.nom}
+                    Par {formation.user.name}
                   </p>
                 </div>
 

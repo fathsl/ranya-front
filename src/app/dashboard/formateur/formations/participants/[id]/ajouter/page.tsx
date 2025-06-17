@@ -51,6 +51,55 @@ const AddUserForm = () => {
     return await bcrypt.hash(password, saltRounds);
   };
 
+  const getFormationName = async (id: string) => {
+    try {
+      const response = await fetch(`/api/formations/${id}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch formation details");
+      }
+
+      return result.data?.name || "Formation";
+    } catch (error) {
+      console.error("Error fetching formation name:", error);
+      return "Formation"; // Default fallback
+    }
+  };
+
+  const sendWelcomeEmail = async (
+    recipientEmail: string,
+    recipientName: string,
+    password: string,
+    formationName: string
+  ) => {
+    try {
+      const response = await fetch("/api/send-welcome", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          recipientEmail,
+          recipientName,
+          password,
+          formationName,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send welcome email");
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Error sending welcome email:", error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async () => {
     setSubmitLoading(true);
     setError("");
@@ -74,6 +123,8 @@ const AddUserForm = () => {
         throw new Error("ID de formation manquant");
       }
 
+      // Store the plain password before hashing
+      const plainPassword = formData.password;
       const hashedPassword = await hashPassword(formData.password);
 
       const userData = {
@@ -92,6 +143,7 @@ const AddUserForm = () => {
         password: "[HASHED]",
       });
 
+      // Create the user
       const response = await fetch("/api/users/addUserWithFormation", {
         method: "POST",
         headers: {
@@ -108,11 +160,30 @@ const AddUserForm = () => {
         );
       }
 
-      setSuccess(
-        result.message || "Participant ajouté avec succès à la formation !"
-      );
+      try {
+        const formationName = await getFormationName(id);
 
-      // Reset form
+        await sendWelcomeEmail(
+          formData.email,
+          formData.name,
+          plainPassword,
+          formationName
+        );
+
+        setSuccess(
+          `${
+            result.message || "Participant ajouté avec succès à la formation !"
+          } Un email de bienvenue a été envoyé.`
+        );
+      } catch (emailError) {
+        console.error("Email sending failed:", emailError);
+        setSuccess(
+          `${
+            result.message || "Participant ajouté avec succès à la formation !"
+          } Cependant, l'email de bienvenue n'a pas pu être envoyé.`
+        );
+      }
+
       setFormData({
         name: "",
         email: "",
@@ -124,8 +195,8 @@ const AddUserForm = () => {
       });
 
       setTimeout(() => {
-        router.push(`/dashboard/formateur/formations/${id}/participants`);
-      }, 2000);
+        router.push(`/dashboard/formateur/formations/participants/${id}`);
+      }, 3000);
     } catch (err) {
       console.error("Error submitting user:", err);
       setError(err.message || "Une erreur est survenue");

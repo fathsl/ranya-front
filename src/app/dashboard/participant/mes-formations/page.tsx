@@ -1,10 +1,48 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Formation, Participant } from "../../formateur/formations/page";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/authContext";
 import { BookOpenIcon, EyeIcon, FilterXIcon, UsersIcon } from "lucide-react";
+
+interface User {
+  id: string;
+  name: string;
+  role: string;
+  email?: string;
+}
+interface ModuleEntity {
+  id: string;
+  titre: string;
+}
+
+interface Participant {
+  id: string;
+  nom: string;
+}
+
+export interface Formation {
+  id: string;
+  titre: string;
+  domaine: string;
+  image?: string;
+  description: string;
+  objectifs: string;
+  accessType: "public" | "private";
+  archived: boolean;
+  invitation: {
+    mode: "link" | "email" | "csv";
+    emails: string[];
+    linkGenerated: boolean;
+    csvFile?: unknown;
+  };
+  user: User;
+  userId: string;
+  modules: ModuleEntity[];
+  participants: Participant[];
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
 
 export default function MesFormations() {
   const { user } = useAuth();
@@ -78,9 +116,7 @@ export default function MesFormations() {
           formation.description
             .toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
-          formation.formateur.nom
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())
+          formation.user.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -93,6 +129,16 @@ export default function MesFormations() {
   };
 
   const uniqueDomains = Array.from(new Set(formations.map((f) => f.domaine)));
+
+  const getImageUrl = (imageName: string | null | undefined) => {
+    if (!imageName) return null;
+
+    if (imageName.startsWith("http") || imageName.startsWith("/uploads/")) {
+      return imageName;
+    }
+
+    return `/uploads/${imageName}`;
+  };
 
   if (loading) {
     return (
@@ -181,7 +227,9 @@ export default function MesFormations() {
                 className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden"
                 style={{
                   backgroundImage: formation.image
-                    ? `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${formation.image})`
+                    ? `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${getImageUrl(
+                        formation.image
+                      )})`
                     : undefined,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
@@ -193,7 +241,7 @@ export default function MesFormations() {
                     {formation.titre}
                   </h3>
                   <p className="text-white/90 text-sm">
-                    Par {formation.formateur.nom}
+                    Par {formation.user.name}
                   </p>
                 </div>
 

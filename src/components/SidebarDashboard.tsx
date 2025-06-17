@@ -7,7 +7,6 @@ import {
   FilesIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
-  UserCheckIcon,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
@@ -35,13 +34,12 @@ const Sidebar = () => {
       icon: CalendarIcon,
       href: "/dashboard/participant/calendrier",
     },
-
-    {
-      id: "formateurs",
-      label: "Formateurs",
-      icon: UserCheckIcon,
-      href: "/dashboard/formateur/formateurs",
-    },
+    // {
+    //   id: "formateurs",
+    //   label: "Formateurs",
+    //   icon: UserCheckIcon,
+    //   href: "/dashboard/formateur/formateurs",
+    // },
     {
       id: "participants",
       label: "Participants",

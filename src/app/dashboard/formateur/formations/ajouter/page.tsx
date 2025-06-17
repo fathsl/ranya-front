@@ -15,7 +15,6 @@ import {
   XIcon,
   FileTextIcon,
   CheckCircleIcon,
-  SaveIcon,
   Link2Icon,
   MailIcon,
   CheckIcon,
@@ -23,6 +22,7 @@ import {
 import { useAuth } from "@/contexts/authContext";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
+import DynamicResourceTable from "@/components/DynamicResourceTable";
 
 interface User {
   id: string;
@@ -40,8 +40,17 @@ interface ModuleData {
   resources?: {
     id?: string;
     title: string;
-    type: "document" | "video" | "link" | "image";
-    url: string;
+    type: "document" | "video" | "link" | "image" | "table";
+    url?: string;
+    content?: string;
+    tableData?: {
+      headers: string[];
+      data: string[][];
+    };
+    fileName?: string;
+    fileSize?: number;
+    previewUrl?: string;
+    file?: File | null;
     isSaved?: boolean;
   }[];
   questions?: {
@@ -915,21 +924,55 @@ const FormationCreator = ({
       return;
     }
 
-    if (!resource.title.trim() || !resource.url.trim()) {
-      setError("Resource title and URL are required");
+    if (!resource.title.trim()) {
+      setError("Resource title is required");
       return;
+    }
+
+    if (resource.type === "table") {
+      if (
+        !resource.tableData ||
+        !resource.tableData.headers ||
+        !resource.tableData.data
+      ) {
+        setError("Table data is required for table resources");
+        return;
+      }
+    } else if (["image", "video", "document"].includes(resource.type)) {
+      if (!resource.url && !resource.file) {
+        setError("File or URL is required for this resource type");
+        return;
+      }
     }
 
     try {
       setSavingResource(`${moduleIndex}-${resourceIndex}`);
       setError(null);
 
-      const savedResource = await createResource({
+      const resourceData: any = {
         title: resource.title,
         type: resource.type,
-        url: resource.url,
         moduleId: currentModule.id,
-      });
+      };
+
+      if (resource.type === "table") {
+        resourceData.tableData = resource.tableData;
+      } else {
+        resourceData.url = resource.url || "";
+        if (resource.previewUrl) {
+          resourceData.previewUrl = resource.previewUrl;
+        }
+        if (resource.file) {
+          resourceData.fileName = resource.file.name;
+          resourceData.fileSize = resource.file.size;
+        }
+      }
+
+      if (resource.content) {
+        resourceData.content = resource.content;
+      }
+
+      const savedResource = await createResource(resourceData);
 
       setFormData((prev) => ({
         ...prev,
@@ -952,7 +995,6 @@ const FormationCreator = ({
         ),
       }));
 
-      // Show success feedback briefly
       setTimeout(() => {
         setSavingResource(null);
       }, 1000);
@@ -1159,9 +1201,40 @@ const FormationCreator = ({
   };
 
   const handleNextStep = async () => {
-    const success = await createInvitation();
-    if (success) {
+    setIsCreatingInvitation(true);
+
+    try {
+      const formationUpdateData = {
+        accessType: formData.accessType,
+      };
+
+      const formationResponse = await fetch(
+        `/api/formations/${currentFormationId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(formationUpdateData),
+        }
+      );
+
+      if (!formationResponse.ok) {
+        throw new Error("Failed to update formation access type");
+      }
+
+      if (formData.accessType === "private") {
+        const invitationSuccess = await createInvitation();
+        if (!invitationSuccess) {
+          return;
+        }
+      }
+
       setCurrentStep(4);
+    } catch (error) {
+      console.error("Error updating formation:", error);
+    } finally {
+      setIsCreatingInvitation(false);
     }
   };
 
@@ -1232,6 +1305,7 @@ const FormationCreator = ({
         : new Error("An unexpected error occurred while saving quiz questions");
     }
   };
+
   if (loading && mode === "edit") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
@@ -1600,131 +1674,15 @@ const FormationCreator = ({
 
                         {/* Resources Section */}
                         <div className="mt-4 p-4 bg-white rounded-lg border border-gray-100">
-                          <div className="flex items-center justify-between mb-4">
-                            <h5 className="text-md font-medium text-gray-800 flex items-center gap-2">
-                              <FileTextIcon
-                                size={18}
-                                className="text-green-600"
-                              />
-                              Resources
-                            </h5>
-                            <button
-                              onClick={() => addResource(index)}
-                              className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-all text-sm font-medium flex items-center gap-2"
-                            >
-                              <PlusIcon size={16} />
-                              Add Resource
-                            </button>
-                          </div>
-
-                          {module.resources && module.resources.length > 0 ? (
-                            <div className="space-y-3">
-                              {module.resources.map(
-                                (resource, resourceIndex) => (
-                                  <div
-                                    key={resourceIndex}
-                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                                  >
-                                    <div className="flex-1">
-                                      <input
-                                        type="text"
-                                        value={resource.title || ""}
-                                        onChange={(e) =>
-                                          updateResource(
-                                            index,
-                                            resourceIndex,
-                                            "title",
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-                                        placeholder="Resource title"
-                                      />
-                                    </div>
-                                    <div className="flex-1">
-                                      <select
-                                        value={resource.type || "document"}
-                                        onChange={(e) =>
-                                          updateResource(
-                                            index,
-                                            resourceIndex,
-                                            "type",
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-                                      >
-                                        <option value="document">
-                                          Document
-                                        </option>
-                                        <option value="video">Video</option>
-                                        <option value="link">Link</option>
-                                        <option value="image">Image</option>
-                                      </select>
-                                    </div>
-                                    <div className="flex-1">
-                                      <input
-                                        type="url"
-                                        value={resource.url || ""}
-                                        onChange={(e) =>
-                                          updateResource(
-                                            index,
-                                            resourceIndex,
-                                            "url",
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-                                        placeholder="Resource URL"
-                                      />
-                                    </div>
-                                    <div className="flex flex-row justify-between space-x-2">
-                                      <button
-                                        onClick={() =>
-                                          removeResource(index, resourceIndex)
-                                        }
-                                        className="text-red-500 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-all"
-                                      >
-                                        <XIcon size={16} />
-                                      </button>
-                                      <button
-                                        onClick={() =>
-                                          saveResource(index, resourceIndex)
-                                        }
-                                        disabled={
-                                          savingResource ===
-                                          `${index}-${resourceIndex}`
-                                        }
-                                        className={`p-2 rounded-lg transition-all ${
-                                          savingResource ===
-                                          `${index}-${resourceIndex}`
-                                            ? "text-gray-400 cursor-not-allowed"
-                                            : resource.isSaved
-                                            ? "text-green-600 hover:text-green-700 hover:bg-green-50"
-                                            : "text-green-400 hover:text-green-600 hover:bg-green-50"
-                                        }`}
-                                      >
-                                        {savingResource ===
-                                        `${index}-${resourceIndex}` ? (
-                                          <div className="animate-spin h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full" />
-                                        ) : (
-                                          <SaveIcon size={16} />
-                                        )}
-                                      </button>
-                                    </div>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-center py-6 text-gray-500">
-                              <FileTextIcon
-                                size={24}
-                                className="mx-auto mb-2 text-gray-300"
-                              />
-                              <p className="text-sm">No resources added yet</p>
-                            </div>
-                          )}
+                          <DynamicResourceTable
+                            module={module}
+                            index={index}
+                            updateResource={updateResource}
+                            removeResource={removeResource}
+                            saveResource={saveResource}
+                            savingResource={savingResource}
+                            addResource={addResource}
+                          />
                         </div>
 
                         {/* Questions Section */}

@@ -18,49 +18,21 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
-interface Formateur {
-  id: string;
-  nom: string;
-  email: string;
-}
-
 interface ModuleEntity {
   id: string;
   titre: string;
 }
 
+interface User {
+  id: string;
+  name: string;
+  role: string;
+  email?: string;
+}
+
 interface Participant {
   id: string;
   nom: string;
-}
-
-interface Formation {
-  id: string;
-  titre: string;
-  domaine: string;
-  image?: string;
-  description: string;
-  objectifs: string;
-  accessType: "public" | "private";
-  archived: boolean;
-  invitation: {
-    mode: "link" | "email" | "csv";
-    emails: string[];
-    linkGenerated: boolean;
-    csvFile?: unknown;
-  };
-  formateur: Formateur;
-  formateurId: string;
-  modules: ModuleEntity[];
-  participants: Participant[];
-  createdAt: string | Date;
-  updatedAt: string | Date;
-}
-
-interface Formateur {
-  id: string;
-  nom: string;
-  email: string;
 }
 
 interface ResourceEntity {
@@ -93,7 +65,7 @@ interface Participant {
   email: string;
 }
 
-interface Formation {
+export interface Formation {
   id: string;
   titre: string;
   domaine: string;
@@ -101,7 +73,15 @@ interface Formation {
   description: string;
   objectifs: string;
   accessType: "public" | "private";
-  formateur: Formateur;
+  archived: boolean;
+  invitation: {
+    mode: "link" | "email" | "csv";
+    emails: string[];
+    linkGenerated: boolean;
+    csvFile?: unknown;
+  };
+  user: User;
+  userId: string;
   modules: ModuleEntity[];
   participants: Participant[];
   createdAt: string | Date;
@@ -120,6 +100,16 @@ const FormationDetailsParticipant = () => {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const [expandedResources, setExpandedResources] = useState(new Set());
+
+  const getImageUrl = (imageName: string | null | undefined) => {
+    if (!imageName) return null;
+
+    if (imageName.startsWith("http") || imageName.startsWith("/uploads/")) {
+      return imageName;
+    }
+
+    return `/uploads/${imageName}`;
+  };
 
   const currentUser = {
     id: user?.id,
@@ -184,7 +174,7 @@ const FormationDetailsParticipant = () => {
       const response = await fetch(
         `http://127.0.0.1:3001/formations/${formationId}`,
         {
-          method: "PATCH",
+          method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
@@ -268,7 +258,7 @@ const FormationDetailsParticipant = () => {
     return url.includes("youtube.com") || url.includes("youtu.be");
   };
 
-  const toggleResourceExpansion = (resourceId) => {
+  const toggleResourceExpansion = (resourceId: string) => {
     const newExpanded = new Set(expandedResources);
     if (newExpanded.has(resourceId)) {
       newExpanded.delete(resourceId);
@@ -423,7 +413,7 @@ const FormationDetailsParticipant = () => {
                 </span>
                 <div className="flex items-center gap-1 text-gray-600">
                   <UserIcon size={16} />
-                  <span className="text-sm">Par {formation.formateur.nom}</span>
+                  <span className="text-sm">Par {formation.user.name}</span>
                 </div>
                 {isEnrolled && (
                   <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full flex items-center gap-1">
@@ -443,7 +433,7 @@ const FormationDetailsParticipant = () => {
             {formation.image && (
               <div className="rounded-xl overflow-hidden shadow-lg">
                 <img
-                  src={formation.image}
+                  src={getImageUrl(formation.image)}
                   alt={formation.titre}
                   className="w-full h-64 object-cover"
                 />
@@ -641,10 +631,10 @@ const FormationDetailsParticipant = () => {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-800">
-                    {formation.formateur.nom}
+                    {formation.user.name}
                   </p>
                   <p className="text-sm text-gray-600">
-                    {formation.formateur.email}
+                    {formation.user.email}
                   </p>
                 </div>
               </div>

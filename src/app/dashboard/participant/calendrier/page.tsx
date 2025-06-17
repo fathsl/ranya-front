@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/authContext";
 import { useEffect, useState } from "react";
 import {
+  BellIcon,
   BookOpenIcon,
   CalendarIcon,
   ChevronLeftIcon,
@@ -13,10 +14,13 @@ import {
   UsersIcon,
   XIcon,
 } from "lucide-react";
+import ReminderDrawer from "@/components/ReminderDrawer";
 
-interface Formateur {
+interface User {
   id: string;
-  nom: string;
+  name: string;
+  role: string;
+  email?: string;
 }
 
 interface ModuleEntity {
@@ -30,7 +34,7 @@ interface Participant {
   id: string;
 }
 
-interface Formation {
+export interface Formation {
   id: string;
   titre: string;
   domaine: string;
@@ -45,8 +49,8 @@ interface Formation {
     linkGenerated: boolean;
     csvFile?: unknown;
   };
-  formateur: Formateur;
-  formateurId: string;
+  user: User;
+  userId: string;
   modules: ModuleEntity[];
   participants: Participant[];
   createdAt: string | Date;
@@ -58,6 +62,8 @@ const FormationCalendar = () => {
   const [selectedFormation, setSelectedFormation] = useState<Formation | null>(
     null
   );
+  const [isReminderDrawerOpen, setIsReminderDrawerOpen] = useState(false);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formations, setFormations] = useState<Formation[]>([]);
   const [filteredFormations, setFilteredFormations] = useState<Formation[]>([]);
@@ -90,9 +96,7 @@ const FormationCalendar = () => {
 
           if (formation.accessType === "public") return true;
 
-          if (formation.accessType === "private" && user?.email) {
-            return formation.invitation?.emails?.includes(user.email);
-          }
+          if (formation.userId === user?.id) return true;
 
           return false;
         });
@@ -108,7 +112,7 @@ const FormationCalendar = () => {
     };
 
     fetchFormations();
-  }, [user?.email]);
+  }, [user?.id]);
 
   useEffect(() => {
     const filtered = formations.filter(
@@ -117,7 +121,7 @@ const FormationCalendar = () => {
         formation.description
           ?.toLowerCase()
           .includes(searchTerm.toLowerCase()) ||
-        formation.formateur?.nom
+        formation.user?.name
           ?.toLowerCase()
           .includes(searchTerm.toLowerCase()) ||
         formation.domaine?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -250,7 +254,6 @@ const FormationCalendar = () => {
 
         {/* Calendar */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-          {/* Calendar Header */}
           <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-800">
@@ -373,9 +376,7 @@ const FormationCalendar = () => {
                 </div>
               </div>
 
-              {/* Modal Content */}
               <div className="p-6 space-y-6">
-                {/* Formation Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div>
@@ -384,7 +385,7 @@ const FormationCalendar = () => {
                         Formateur
                       </h3>
                       <p className="text-gray-600">
-                        {selectedFormation.formateur?.nom || "Non spécifié"}
+                        {selectedFormation.user?.name || "Non spécifié"}
                       </p>
                     </div>
 
@@ -492,7 +493,7 @@ const FormationCalendar = () => {
                     <div className="flex justify-between">
                       <span>Formateur ID:</span>
                       <span className="font-medium">
-                        {selectedFormation.formateurId || "Non défini"}
+                        {selectedFormation.userId || "Non défini"}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -559,6 +560,18 @@ const FormationCalendar = () => {
                       </div>
                     </div>
                   )}
+
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setIsReminderDrawerOpen(true)}
+                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"
+                    >
+                      <BellIcon size={18} />
+                      Envoyer un rappel
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
@@ -575,6 +588,11 @@ const FormationCalendar = () => {
             </div>
           </div>
         )}
+        <ReminderDrawer
+          isOpen={isReminderDrawerOpen}
+          onClose={() => setIsReminderDrawerOpen(false)}
+          formation={selectedFormation}
+        />
       </div>
     </div>
   );
