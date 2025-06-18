@@ -8,12 +8,15 @@ import {
   EyeIcon,
   EyeOffIcon,
   GraduationCapIcon,
+  LinkIcon,
   LockIcon,
   MailIcon,
+  PhoneIcon,
   RocketIcon,
   StarIcon,
   UserIcon,
 } from "lucide-react";
+import DocumentUpload from "@/components/DocumentUpload";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -21,6 +24,10 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [telephone, setTelephone] = useState("");
+  const [linkedInLink, setLinkedInLink] = useState("");
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [, setCvUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -42,6 +49,28 @@ export default function RegisterPage() {
     setPasswordStrength(checkPasswordStrength(newPassword));
   };
 
+  const handleCvUpload = (file: File | null, documentUrl: string) => {
+    setCvFile(file);
+    setCvUrl(documentUrl);
+  };
+
+  const uploadCvToServer = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("cv", file);
+
+    const response = await fetch("/api/upload/cv", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Erreur lors du téléchargement du CV");
+    }
+
+    const data = await response.json();
+    return data.filename;
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -55,6 +84,12 @@ export default function RegisterPage() {
     setError("");
 
     try {
+      let cvFileName = "";
+
+      if (cvFile) {
+        cvFileName = await uploadCvToServer(cvFile);
+      }
+
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
@@ -63,8 +98,12 @@ export default function RegisterPage() {
         body: JSON.stringify({
           name,
           email,
+          telephone,
           password,
           role: "formateur",
+          linkedInLink: linkedInLink || undefined,
+          cv: cvFileName || undefined,
+          isAccepted: false,
         }),
       });
 
@@ -257,6 +296,46 @@ export default function RegisterPage() {
 
               <div className="relative group">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Téléphone
+                </label>
+                <div className="relative">
+                  <PhoneIcon
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors"
+                    size={20}
+                  />
+                  <input
+                    type="tel"
+                    placeholder="+216 12 345 678"
+                    className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
+                    value={telephone}
+                    onChange={(e) => setTelephone(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="relative group">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lien LinkedIn{" "}
+                  <span className="text-gray-500 text-xs">(optionnel)</span>
+                </label>
+                <div className="relative">
+                  <LinkIcon
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors"
+                    size={20}
+                  />
+                  <input
+                    type="url"
+                    placeholder="https://linkedin.com/in/votre-profil"
+                    className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
+                    value={linkedInLink}
+                    onChange={(e) => setLinkedInLink(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="relative group">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Mot de passe
                 </label>
                 <div className="relative">
@@ -355,12 +434,26 @@ export default function RegisterPage() {
                 </div>
               </div>
 
+              <DocumentUpload
+                label="CV"
+                onDocumentChange={handleCvUpload}
+                accept=".pdf,.doc,.docx"
+                className="mt-6"
+              />
+
+              {error && (
+                <div className="text-red-600 text-sm mt-2 p-3 bg-red-50 rounded-lg">
+                  {error}
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={
                   loading ||
                   !name ||
                   !email ||
+                  !telephone ||
                   !password ||
                   !confirmPassword ||
                   password !== confirmPassword
@@ -369,6 +462,7 @@ export default function RegisterPage() {
                   loading ||
                   !name ||
                   !email ||
+                  !telephone ||
                   !password ||
                   !confirmPassword ||
                   password !== confirmPassword

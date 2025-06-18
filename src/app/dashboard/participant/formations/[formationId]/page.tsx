@@ -5,12 +5,16 @@ import {
   BookOpenIcon,
   CalendarIcon,
   CheckCircleIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   ClockIcon,
+  EyeIcon,
   FileIcon,
   FileTextIcon,
   ImageIcon,
   PlayCircleIcon,
   PlayIcon,
+  TableIcon,
   TargetIcon,
   UserIcon,
   UsersIcon,
@@ -21,6 +25,10 @@ import { useState, useEffect } from "react";
 interface ModuleEntity {
   id: string;
   titre: string;
+  description?: string;
+  order: number;
+  duration?: number;
+  resources: ResourceEntity[];
 }
 
 interface User {
@@ -33,36 +41,28 @@ interface User {
 interface Participant {
   id: string;
   nom: string;
+  email: string;
 }
 
 interface ResourceEntity {
   id: string;
   title: string;
-  type: "video" | "pdf" | "text";
-  videoLink?: string;
-  pdfLink?: string;
-  textLink?: string;
+  type: "video" | "pdf" | "image" | "document" | "table";
+  url?: string;
   content?: string;
   duration?: number;
   order: number;
-  isCompleted: boolean;
+  isSaved: boolean;
   thumbnail?: string;
   description?: string;
-}
-
-interface ModuleEntity {
-  id: string;
-  titre: string;
-  description?: string;
-  order: number;
-  duration?: number;
-  resources: ResourceEntity[];
-}
-
-interface Participant {
-  id: string;
-  nom: string;
-  email: string;
+  tableData?: {
+    headers: string[];
+    data: string[][];
+  };
+  fileName?: string;
+  fileSize?: number;
+  previewUrl?: string;
+  moduleId: string;
 }
 
 export interface Formation {
@@ -99,15 +99,14 @@ const FormationDetailsParticipant = () => {
   const [enrolling, setEnrolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const [expandedModules, setExpandedModules] = useState(new Set());
   const [expandedResources, setExpandedResources] = useState(new Set());
 
   const getImageUrl = (imageName: string | null | undefined) => {
     if (!imageName) return null;
-
     if (imageName.startsWith("http") || imageName.startsWith("/uploads/")) {
       return imageName;
     }
-
     return `/uploads/${imageName}`;
   };
 
@@ -158,7 +157,6 @@ const FormationDetailsParticipant = () => {
     }
   }, [formationId, currentUser.id]);
 
-  // New enrollment function
   const handleEnrollment = async () => {
     if (!currentUser.id || !formation) return;
 
@@ -166,7 +164,6 @@ const FormationDetailsParticipant = () => {
       setEnrolling(true);
       setError(null);
 
-      // Get current participant IDs and add the current user
       const currentParticipantIds =
         formation.participants?.map((p) => p.id) || [];
       const updatedParticipantIds = [...currentParticipantIds, currentUser.id];
@@ -195,7 +192,6 @@ const FormationDetailsParticipant = () => {
       setFormation(updatedFormation);
       setIsEnrolled(true);
 
-      // Show success message or redirect
       console.log("Successfully enrolled in formation!");
     } catch (error: any) {
       setError(error.message || "Failed to enroll in formation");
@@ -213,6 +209,10 @@ const FormationDetailsParticipant = () => {
         return <ImageIcon size={20} className="text-blue-500" />;
       case "pdf":
         return <FileTextIcon size={20} className="text-red-600" />;
+      case "document":
+        return <FileIcon size={20} className="text-green-600" />;
+      case "table":
+        return <TableIcon size={20} className="text-purple-600" />;
       default:
         return <FileIcon size={20} className="text-gray-500" />;
     }
@@ -220,9 +220,9 @@ const FormationDetailsParticipant = () => {
 
   const getTotalDuration = () => {
     if (!formation?.modules) return 0;
-    return formation.modules.reduce((total) => {
+    return formation.modules.reduce((total, module) => {
       const moduleDuration =
-        formation.modules?.reduce((sum, resource) => {
+        module.resources?.reduce((sum, resource) => {
           return sum + (resource.duration || 0);
         }, 0) || 0;
       return total + moduleDuration;
@@ -258,6 +258,16 @@ const FormationDetailsParticipant = () => {
     return url.includes("youtube.com") || url.includes("youtu.be");
   };
 
+  const toggleModuleExpansion = (moduleId: string) => {
+    const newExpanded = new Set(expandedModules);
+    if (newExpanded.has(moduleId)) {
+      newExpanded.delete(moduleId);
+    } else {
+      newExpanded.add(moduleId);
+    }
+    setExpandedModules(newExpanded);
+  };
+
   const toggleResourceExpansion = (resourceId: string) => {
     const newExpanded = new Set(expandedResources);
     if (newExpanded.has(resourceId)) {
@@ -268,56 +278,102 @@ const FormationDetailsParticipant = () => {
     setExpandedResources(newExpanded);
   };
 
-  const renderResourceContent = (resource) => {
-    const isExpanded = expandedResources.has(resource.id);
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
 
+  const renderResourceContent = (resource: ResourceEntity) => {
+    const isExpanded = expandedResources.has(resource.id);
     if (!isExpanded) return null;
 
     switch (resource.type) {
       case "image":
         return (
-          <div className="mt-3 p-3 bg-white rounded-lg border">
-            <img
-              src={resource.url}
-              alt={resource.title}
-              className="max-w-full h-auto rounded-lg shadow-sm"
-              onError={(e) => {
-                e.target.src =
-                  "https://via.placeholder.com/600x400/CCCCCC/666666?text=Image+non+disponible";
-              }}
-            />
+          <div className="mt-3 p-4 bg-white rounded-lg border shadow-sm">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-medium text-gray-800">Aperçu de l'image</h4>
+              {resource.fileSize && (
+                <span className="text-sm text-gray-500">
+                  {formatFileSize(resource.fileSize)}
+                </span>
+              )}
+            </div>
+            <div className="flex justify-center">
+              {resource.previewUrl || resource.url ? (
+                <img
+                  src={resource.previewUrl || resource.url}
+                  alt={resource.title}
+                  className="max-w-full max-h-96 object-contain rounded-lg shadow-sm border"
+                  onError={(e) => {
+                    e.target.src =
+                      "https://via.placeholder.com/600x400/CCCCCC/666666?text=Image+non+disponible";
+                  }}
+                />
+              ) : (
+                <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <p className="text-gray-500">Aperçu non disponible</p>
+                </div>
+              )}
+            </div>
+            {resource.url && (
+              <div className="mt-3 flex justify-center">
+                <a
+                  href={resource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                >
+                  <EyeIcon size={16} />
+                  Voir en taille réelle
+                </a>
+              </div>
+            )}
           </div>
         );
 
       case "video":
         return (
-          <div className="mt-3 p-3 bg-white rounded-lg border">
-            {resource.url && isYouTubeUrl(resource.url) ? (
-              <div
-                className="relative w-full"
-                style={{ paddingBottom: "56.25%" }}
-              >
-                <iframe
-                  src={getYouTubeEmbedUrl(resource.url)}
-                  className="absolute top-0 left-0 w-full h-full rounded-lg"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  title={resource.title}
-                />
-              </div>
-            ) : resource.url ? (
-              <video
-                controls
-                className="w-full max-w-2xl rounded-lg shadow-sm"
-                preload="metadata"
-              >
-                <source src={resource.url} type="video/mp4" />
-                Votre navigateur ne supporte pas la lecture vidéo.
-              </video>
+          <div className="mt-3 p-4 bg-white rounded-lg border shadow-sm">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-medium text-gray-800">Lecteur vidéo</h4>
+              {resource.duration && (
+                <span className="text-sm text-gray-500">
+                  {formatDuration(resource.duration)}
+                </span>
+              )}
+            </div>
+            {resource.url ? (
+              isYouTubeUrl(resource.url) ? (
+                <div
+                  className="relative w-full"
+                  style={{ paddingBottom: "56.25%" }}
+                >
+                  <iframe
+                    src={getYouTubeEmbedUrl(resource.url)}
+                    className="absolute top-0 left-0 w-full h-full rounded-lg"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title={resource.title}
+                  />
+                </div>
+              ) : (
+                <video
+                  controls
+                  className="w-full max-h-96 rounded-lg shadow-sm"
+                  preload="metadata"
+                >
+                  <source src={resource.url} type="video/mp4" />
+                  Votre navigateur ne supporte pas la lecture vidéo.
+                </video>
+              )
             ) : (
-              <div className="p-4 bg-gray-100 rounded-lg text-center text-gray-600">
-                URL de la vidéo non disponible
+              <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                <p className="text-gray-500">Vidéo non disponible</p>
               </div>
             )}
           </div>
@@ -325,30 +381,164 @@ const FormationDetailsParticipant = () => {
 
       case "pdf":
         return (
-          <div className="mt-3 p-3 bg-white rounded-lg border">
-            <iframe
-              src={resource.url}
-              className="w-full h-96 rounded-lg border"
-              title={resource.title}
-            />
-            <div className="mt-2 text-center">
-              <a
-                href={resource.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <FileTextIcon size={16} />
-                Ouvrir le PDF dans un nouvel onglet
-              </a>
+          <div className="mt-3 p-4 bg-white rounded-lg border shadow-sm">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-medium text-gray-800">Document PDF</h4>
+              {resource.fileSize && (
+                <span className="text-sm text-gray-500">
+                  {formatFileSize(resource.fileSize)}
+                </span>
+              )}
             </div>
+            {resource.url ? (
+              <>
+                <div className="border rounded-lg overflow-hidden">
+                  <iframe
+                    src={`${resource.url}#toolbar=1&navpanes=1&scrollbar=1`}
+                    className="w-full h-96"
+                    title={resource.title}
+                  />
+                </div>
+                <div className="mt-3 flex justify-center">
+                  <a
+                    href={resource.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                  >
+                    <FileTextIcon size={16} />
+                    Ouvrir dans un nouvel onglet
+                  </a>
+                </div>
+              </>
+            ) : (
+              <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                <p className="text-gray-500">PDF non disponible</p>
+              </div>
+            )}
+          </div>
+        );
+
+      case "document":
+        return (
+          <div className="mt-3 p-4 bg-white rounded-lg border shadow-sm">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-medium text-gray-800">Document</h4>
+              <div className="flex items-center gap-3">
+                {resource.fileSize && (
+                  <span className="text-sm text-gray-500">
+                    {formatFileSize(resource.fileSize)}
+                  </span>
+                )}
+                {resource.fileName && (
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                    {resource.fileName.split(".").pop()?.toUpperCase()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {resource.content ? (
+              <div className="bg-gray-50 p-4 rounded-lg max-h-64 overflow-y-auto">
+                <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono">
+                  {resource.content}
+                </pre>
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50 rounded-lg">
+                <FileIcon size={48} className="mx-auto text-gray-400 mb-3" />
+                <p className="text-gray-600 mb-3">
+                  Contenu du document non disponible
+                </p>
+                {resource.fileName && (
+                  <p className="text-sm text-gray-500">
+                    Fichier: {resource.fileName}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {resource.url && (
+              <div className="mt-3 flex justify-center">
+                <a
+                  href={resource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                >
+                  <FileIcon size={16} />
+                  Télécharger le document
+                </a>
+              </div>
+            )}
+          </div>
+        );
+
+      case "table":
+        return (
+          <div className="mt-3 p-4 bg-white rounded-lg border shadow-sm">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-medium text-gray-800">Tableau de données</h4>
+              {resource.tableData && (
+                <span className="text-sm text-gray-500">
+                  {resource.tableData.data.length} ligne
+                  {resource.tableData.data.length > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            {resource.tableData &&
+            resource.tableData.headers &&
+            resource.tableData.data ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-collapse border border-gray-300">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      {resource.tableData.headers.map((header, index) => (
+                        <th
+                          key={index}
+                          className="border border-gray-300 px-4 py-2 text-left font-medium text-gray-700"
+                        >
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resource.tableData.data.map((row, rowIndex) => (
+                      <tr
+                        key={rowIndex}
+                        className={
+                          rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }
+                      >
+                        {row.map((cell, cellIndex) => (
+                          <td
+                            key={cellIndex}
+                            className="border border-gray-300 px-4 py-2 text-sm text-gray-600"
+                          >
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50 rounded-lg">
+                <TableIcon size={48} className="mx-auto text-gray-400 mb-3" />
+                <p className="text-gray-600">
+                  Données du tableau non disponibles
+                </p>
+              </div>
+            )}
           </div>
         );
 
       default:
         return (
-          <div className="mt-3 p-3 bg-gray-100 rounded-lg border">
-            <p className="text-gray-600">
+          <div className="mt-3 p-4 bg-gray-50 rounded-lg border">
+            <p className="text-gray-600 text-center">
               Type de ressource non pris en charge: {resource.type}
             </p>
           </div>
@@ -457,7 +647,6 @@ const FormationDetailsParticipant = () => {
               </div>
             )}
 
-            {/* Error Message */}
             {error && !loading && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-6">
                 <div className="flex items-center gap-3">
@@ -469,7 +658,6 @@ const FormationDetailsParticipant = () => {
               </div>
             )}
 
-            {/* Description */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-2xl font-bold text-gray-800 mb-4">
                 Description
@@ -495,39 +683,65 @@ const FormationDetailsParticipant = () => {
                 Modules de Formation
               </h2>
 
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {formation.modules
                   ?.sort((a, b) => a.order - b.order)
                   .map((module, index) => (
                     <div
                       key={module.id}
-                      className="border border-gray-200 rounded-lg p-5 bg-white shadow-sm"
+                      className="border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden"
                     >
-                      <div className="flex items-start gap-4">
-                        <div className="bg-green-100 text-green-800 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                          {index + 1}
+                      <div
+                        className="p-5 cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => toggleModuleExpansion(module.id)}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="bg-green-100 text-green-800 rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-800">
+                              {module.titre}
+                            </h3>
+                            {module.description && (
+                              <p className="text-gray-600 text-sm mt-1">
+                                {module.description}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {module.resources &&
+                              module.resources.length > 0 && (
+                                <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                  {module.resources.length} ressource
+                                  {module.resources.length > 1 ? "s" : ""}
+                                </span>
+                              )}
+                            <div className="text-gray-400">
+                              {expandedModules.has(module.id) ? (
+                                <ChevronDownIcon size={20} />
+                              ) : (
+                                <ChevronRightIcon size={20} />
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                            {module.titre}
-                          </h3>
-                          {module.description && (
-                            <p className="text-gray-600 mb-4">
-                              {module.description}
-                            </p>
-                          )}
+                      </div>
 
-                          {module.resources && module.resources.length > 0 && (
+                      {expandedModules.has(module.id) &&
+                        module.resources &&
+                        module.resources.length > 0 && (
+                          <div className="border-t border-gray-200 bg-gray-50 p-4">
+                            <h4 className="font-medium text-gray-700 mb-3">
+                              Ressources du module:
+                            </h4>
                             <div className="space-y-3">
-                              <h4 className="font-medium text-gray-700 mb-2">
-                                Ressources:
-                              </h4>
                               {module.resources
                                 .sort((a, b) => a.order - b.order)
                                 .map((resource) => (
                                   <div key={resource.id} className="space-y-2">
                                     <div
-                                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                                      className="flex items-center gap-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-gray-50 transition-colors border"
                                       onClick={() =>
                                         toggleResourceExpansion(resource.id)
                                       }
@@ -542,29 +756,36 @@ const FormationDetailsParticipant = () => {
                                             {resource.description}
                                           </p>
                                         )}
+                                        {resource.originalName && (
+                                          <p className="text-xs text-gray-500 mt-1">
+                                            Fichier: {resource.originalName}
+                                          </p>
+                                        )}
                                       </div>
-                                      {resource.duration && (
-                                        <div className="flex items-center gap-1 text-gray-500">
-                                          <ClockIcon size={14} />
-                                          <span className="text-sm">
-                                            {formatDuration(resource.duration)}
-                                          </span>
+                                      <div className="flex items-center gap-3">
+                                        {resource.duration && (
+                                          <div className="flex items-center gap-1 text-gray-500">
+                                            <ClockIcon size={14} />
+                                            <span className="text-sm">
+                                              {formatDuration(
+                                                resource.duration
+                                              )}
+                                            </span>
+                                          </div>
+                                        )}
+                                        <div className="text-gray-400">
+                                          {expandedResources.has(resource.id)
+                                            ? "▼"
+                                            : "▶"}
                                         </div>
-                                      )}
-                                      <div className="text-gray-400">
-                                        {expandedResources.has(resource.id)
-                                          ? "▼"
-                                          : "▶"}
                                       </div>
                                     </div>
-
                                     {renderResourceContent(resource)}
                                   </div>
                                 ))}
                             </div>
-                          )}
-                        </div>
-                      </div>
+                          </div>
+                        )}
                     </div>
                   ))}
               </div>

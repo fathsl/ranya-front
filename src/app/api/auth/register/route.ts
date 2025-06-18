@@ -4,12 +4,25 @@ interface RegisterData {
   email: string;
   password: string;
   name?: string;
+  telephone: string;
   role: string;
+  linkedInLink?: string;
+  cv?: string;
+  isAccepted?: boolean;
 }
 
 export async function POST(request: NextRequest) {
   const data: RegisterData = await request.json();
-  const { email, password, name, role } = data;
+  const {
+    email,
+    password,
+    name,
+    telephone,
+    role,
+    linkedInLink,
+    cv,
+    isAccepted,
+  } = data;
 
   if (!email || !password || !name) {
     return NextResponse.json(
@@ -27,7 +40,11 @@ export async function POST(request: NextRequest) {
       email,
       password,
       name,
+      telephone,
       role,
+      linkedInLink,
+      cv,
+      isAccepted: isAccepted ?? false,
     }),
   });
 

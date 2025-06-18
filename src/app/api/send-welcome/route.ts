@@ -11,6 +11,9 @@ const transporter = nodemailer.createTransport({
     user: GMAIL_USER,
     pass: GMAIL_PASS,
   },
+  tls: {
+    rejectUnauthorized: false,
+  },
 });
 
 export async function POST(request: Request) {

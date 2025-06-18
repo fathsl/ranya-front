@@ -7,6 +7,10 @@ interface User {
   email: string;
   role: string;
   name?: string;
+  telephone: string;
+  linkedInLink?: string;
+  cv?: string;
+  isAccepted?: boolean;
   token: string;
 }
 

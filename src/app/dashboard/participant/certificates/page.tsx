@@ -14,10 +14,11 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-interface Formateur {
+interface User {
   id: string;
-  nom: string;
-  email: string;
+  name: string;
+  role: string;
+  email?: string;
 }
 
 interface ModuleEntity {
@@ -46,8 +47,8 @@ interface Formation {
     linkGenerated: boolean;
     csvFile?: unknown;
   };
-  formateur: Formateur;
-  formateurId: string;
+  user: User;
+  userId: string;
   modules: ModuleEntity[];
   participants: Participant[];
   createdAt: string | Date;
@@ -61,6 +62,7 @@ interface Certificate {
   formationEntity?: Formation;
   dateObtention: string;
   urlPdf: string;
+  participants: Participant[];
 }
 
 export default function CertificatesList() {
@@ -114,63 +116,101 @@ export default function CertificatesList() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch("http://127.0.0.1:3001/certificats", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
+        // Method 1: Fetch certificates for the current user by userId
+        const response = await fetch(
+          `http://127.0.0.1:3001/certificats/user/${user?.id}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data: Certificate[] = await response.json();
-
-        // More flexible name matching
-        const userCertificates = data.filter((certificate: Certificate) => {
-          if (!user?.name || !certificate.nomParticipant) return false;
-
-          const userName = user.name.toLowerCase().trim();
-          const participantName = certificate.nomParticipant
-            .toLowerCase()
-            .trim();
-
-          // Check for exact match
-          if (participantName === userName) return true;
-
-          // Check if user name is contained in participant name
-          if (participantName.includes(userName)) return true;
-
-          // Check if participant name is contained in user name
-          if (userName.includes(participantName)) return true;
-
-          // Split names and check for partial matches
-          const userNameParts = userName.split(/\s+/);
-          const participantNameParts = participantName.split(/\s+/);
-
-          // Check if any part of user name matches any part of participant name
-          return userNameParts.some((userPart) =>
-            participantNameParts.some(
-              (participantPart) =>
-                userPart === participantPart && userPart.length > 2 // Avoid matching very short names
-            )
-          );
-        });
-
+        const userCertificates: Certificate[] = await response.json();
         setCertificates(userCertificates);
-      } catch (error: any) {
-        setError(error.message || "Unknown error");
-        console.error("Error fetching certificates:", error);
+      } catch (error) {
+        try {
+          const response = await fetch("http://127.0.0.1:3001/certificats", {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data: Certificate[] = await response.json();
+          const userCertificates = data.filter((certificate: Certificate) => {
+            if (
+              certificate.participants &&
+              Array.isArray(certificate.participants)
+            ) {
+              return certificate.participants.some(
+                (participant) => participant.id === user?.id
+              );
+            }
+
+            if (!user?.name || !certificate.nomParticipant) return false;
+
+            const userName = user.name.toLowerCase().trim();
+            const participantName = certificate.nomParticipant
+              .toLowerCase()
+              .trim();
+
+            // Exact match
+            if (participantName === userName) return true;
+
+            // Normalize names by removing extra spaces and special characters
+            const normalizeString = (str: string) =>
+              str
+                .replace(/\s+/g, " ")
+                .replace(/[^\w\s]/g, "")
+                .trim();
+
+            const normalizedUserName = normalizeString(userName);
+            const normalizedParticipantName = normalizeString(participantName);
+
+            if (normalizedParticipantName === normalizedUserName) return true;
+
+            // Split names and check for meaningful matches
+            const userNameParts = normalizedUserName
+              .split(" ")
+              .filter((part) => part.length > 2);
+            const participantNameParts = normalizedParticipantName
+              .split(" ")
+              .filter((part) => part.length > 2);
+
+            // Check if at least 2 name parts match or if there's only one part and it matches
+            const matchingParts = userNameParts.filter((userPart) =>
+              participantNameParts.some(
+                (participantPart) => participantPart === userPart
+              )
+            );
+
+            return matchingParts.length >= Math.min(2, userNameParts.length);
+          });
+
+          setCertificates(userCertificates);
+        } catch (fallbackError: any) {
+          setError(fallbackError.message || "Unknown error");
+          console.error("Error fetching certificates:", fallbackError);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    if (user?.name) {
+    if (user?.id) {
       fetchCertificates();
     }
-  }, [user?.name]);
+  }, [user?.id, user?.name]);
 
   const uniqueDomains = useMemo(() => {
     const domains = certificates
@@ -186,7 +226,7 @@ export default function CertificatesList() {
         certificate.formation
           ?.toLowerCase()
           .includes(searchTerm.toLowerCase()) ||
-        certificate.formationEntity?.formateur?.nom
+        certificate.formationEntity?.user?.name
           ?.toLowerCase()
           .includes(searchTerm.toLowerCase()) ||
         certificate.formationEntity?.domaine
@@ -217,8 +257,8 @@ export default function CertificatesList() {
   };
 
   const generateCertificatePDF = (certificate: any, fileName: string) => {
-    import("jspdf")
-      .then(({ default: jsPDF }) => {
+    Promise.all([import("jspdf"), import("qrcode")])
+      .then(([{ default: jsPDF }, QRCode]) => {
         const doc = new jsPDF({
           orientation: "landscape",
           unit: "mm",
@@ -228,204 +268,365 @@ export default function CertificatesList() {
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
 
-        doc.setFillColor(240, 253, 244);
+        // Beautiful gradient background
+        doc.setFillColor(250, 251, 252);
         doc.rect(0, 0, pageWidth, pageHeight, "F");
 
-        doc.setLineWidth(2);
-        doc.setDrawColor(5, 150, 105);
-        doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+        // Add subtle pattern background
+        doc.setFillColor(239, 246, 255, 0.3);
+        for (let i = 0; i < pageWidth; i += 20) {
+          for (let j = 0; j < pageHeight; j += 20) {
+            doc.circle(i, j, 1, "F");
+          }
+        }
+
+        // Main certificate border - elegant double border
+        doc.setLineWidth(3);
+        doc.setDrawColor(37, 99, 235); // Beautiful blue
+        doc.rect(12, 12, pageWidth - 24, pageHeight - 24);
 
         doc.setLineWidth(1);
-        doc.setDrawColor(245, 158, 11);
-        doc.rect(15, 15, pageWidth - 30, pageHeight - 30);
+        doc.setDrawColor(139, 69, 19); // Elegant brown/gold
+        doc.rect(18, 18, pageWidth - 36, pageHeight - 36);
 
-        const cornerSize = 15;
-        doc.setFillColor(245, 158, 11);
+        // Inner decorative border
+        doc.setLineWidth(0.5);
+        doc.setDrawColor(156, 163, 175);
+        doc.rect(25, 25, pageWidth - 50, pageHeight - 50);
 
-        doc.triangle(15, 15, 15 + cornerSize, 15, 15, 15 + cornerSize, "F");
-        doc.triangle(
-          pageWidth - 15,
-          15,
-          pageWidth - 15 - cornerSize,
-          15,
-          pageWidth - 15,
-          15 + cornerSize,
-          "F"
-        );
-        doc.triangle(
-          15,
-          pageHeight - 15,
-          15 + cornerSize,
-          pageHeight - 15,
-          15,
-          pageHeight - 15 - cornerSize,
-          "F"
-        );
-        doc.triangle(
-          pageWidth - 15,
-          pageHeight - 15,
-          pageWidth - 15 - cornerSize,
-          pageHeight - 15,
-          pageWidth - 15,
-          pageHeight - 15 - cornerSize,
-          "F"
-        );
+        // Header section with beautiful gradient
+        const headerHeight = 45;
+        doc.setFillColor(37, 99, 235);
+        doc.rect(25, 25, pageWidth - 50, headerHeight, "F");
 
-        doc.setFontSize(32);
-        doc.setTextColor(5, 150, 105);
-        doc.setFont("helvetica", "bold");
-        const titleText = "CERTIFICAT DE FORMATION";
-        const titleWidth = doc.getTextWidth(titleText);
-        doc.text(titleText, (pageWidth - titleWidth) / 2, 40);
+        // Add gradient effect to header
+        for (let i = 0; i < 20; i++) {
+          const alpha = 0.1 - (i / 20) * 0.1;
+          doc.setFillColor(59, 130, 246, alpha);
+          doc.rect(25, 25 + i * 2, pageWidth - 50, 2, "F");
+        }
 
-        doc.setLineWidth(3);
-        doc.setDrawColor(245, 158, 11);
-        doc.line(
-          (pageWidth - titleWidth) / 2,
-          45,
-          (pageWidth + titleWidth) / 2,
-          45
-        );
+        // eduPlatform Logo and Branding
+        const logoX = 45;
+        const logoY = 47;
 
-        doc.setFontSize(16);
-        doc.setTextColor(60, 60, 60);
-        doc.setFont("helvetica", "normal");
-        const certifyText = "Nous certifions par les présentes que";
-        const certifyWidth = doc.getTextWidth(certifyText);
-        doc.text(certifyText, (pageWidth - certifyWidth) / 2, 65);
-
-        doc.setFontSize(24);
-        doc.setTextColor(5, 150, 105);
-        doc.setFont("helvetica", "bold");
-        const studentName = certificate.nomParticipant || "Participant";
-        const nameWidth = doc.getTextWidth(studentName);
-        doc.text(studentName, (pageWidth - nameWidth) / 2, 85);
+        // Logo design - elegant and modern
+        doc.setFillColor(255, 255, 255);
+        doc.circle(logoX, logoY, 15, "F");
 
         doc.setLineWidth(2);
-        doc.setDrawColor(245, 158, 11);
+        doc.setDrawColor(139, 69, 19);
+        doc.circle(logoX, logoY, 15);
+
+        // Logo text
+        doc.setFontSize(14);
+        doc.setTextColor(37, 99, 235);
+        doc.setFont("helvetica", "bold");
+        doc.text("edu", logoX - 9, logoY + 2);
+
+        // Platform name in header
+        doc.setFontSize(22);
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.text("eduPlatform", logoX + 30, logoY - 8);
+
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "normal");
+        doc.text("Excellence in Digital Education", logoX + 30, logoY + 5);
+
+        // Beautiful decorative elements in header
+        const decorX = pageWidth - 80;
+        doc.setFillColor(255, 255, 255, 0.3);
+        doc.circle(decorX, 35, 8, "F");
+        doc.circle(decorX + 15, 45, 6, "F");
+        doc.circle(decorX + 30, 40, 5, "F");
+
+        // CERTIFICATE title with proper spacing
+        const titleY = 95;
+        doc.setFontSize(48);
+        doc.setTextColor(37, 99, 235);
+        doc.setFont("times", "bold");
+        const titleText = "CERTIFICATE";
+        const titleWidth = doc.getTextWidth(titleText);
+        doc.text(titleText, (pageWidth - titleWidth) / 2, titleY);
+
+        // Subtitle with good spacing
+        const subtitleY = titleY + 20;
+        doc.setFontSize(18);
+        doc.setTextColor(139, 69, 19);
+        doc.setFont("times", "italic");
+        const subtitleText = "of Achievement";
+        const subtitleWidth = doc.getTextWidth(subtitleText);
+        doc.text(subtitleText, (pageWidth - subtitleWidth) / 2, subtitleY);
+
+        // Decorative line under title
+        const lineY = subtitleY + 8;
+        doc.setLineWidth(2);
+        doc.setDrawColor(37, 99, 235);
+        doc.line((pageWidth - 120) / 2, lineY, (pageWidth + 120) / 2, lineY);
+
+        // Add decorative elements on the line
+        doc.setFillColor(139, 69, 19);
+        doc.circle((pageWidth - 120) / 2 - 5, lineY, 3, "F");
+        doc.circle((pageWidth + 120) / 2 + 5, lineY, 3, "F");
+        doc.circle(pageWidth / 2, lineY, 4, "F");
+
+        // Award text with proper spacing
+        const awardY = lineY + 25;
+        doc.setFontSize(16);
+        doc.setTextColor(55, 65, 81);
+        doc.setFont("times", "normal");
+        const awardText = "This is proudly presented to";
+        const awardWidth = doc.getTextWidth(awardText);
+        doc.text(awardText, (pageWidth - awardWidth) / 2, awardY);
+
+        // Participant name with elegant styling and spacing
+        const nameY = awardY + 25;
+        doc.setFontSize(36);
+        doc.setTextColor(37, 99, 235);
+        doc.setFont("times", "bold");
+        const studentName = certificate.nomParticipant || "Participant Name";
+        const nameWidth = doc.getTextWidth(studentName);
+        doc.text(studentName, (pageWidth - nameWidth) / 2, nameY);
+
+        // Beautiful underline for name
+        const underlineY = nameY + 5;
+        doc.setLineWidth(1.5);
+        doc.setDrawColor(139, 69, 19);
         doc.line(
           (pageWidth - nameWidth) / 2 - 10,
-          90,
+          underlineY,
           (pageWidth + nameWidth) / 2 + 10,
-          90
+          underlineY
         );
 
+        // Achievement description with spacing
+        const achievementY = underlineY + 20;
         doc.setFontSize(16);
-        doc.setTextColor(60, 60, 60);
-        doc.setFont("helvetica", "normal");
-        const completedText = "a terminé avec succès la formation";
-        const completedWidth = doc.getTextWidth(completedText);
-        doc.text(completedText, (pageWidth - completedWidth) / 2, 105);
+        doc.setTextColor(55, 65, 81);
+        doc.setFont("times", "normal");
+        const achievementText = "for successfully completing the course";
+        const achievementWidth = doc.getTextWidth(achievementText);
+        doc.text(
+          achievementText,
+          (pageWidth - achievementWidth) / 2,
+          achievementY
+        );
 
-        doc.setFontSize(20);
-        doc.setTextColor(14, 165, 233);
-        doc.setFont("helvetica", "bold");
+        // Course title with proper spacing
+        const courseY = achievementY + 20;
         const formationTitle =
           certificate.formationEntity?.titre ||
           certificate.formation ||
           fileName ||
-          "Formation";
-        const formationWidth = doc.getTextWidth(formationTitle);
-        doc.text(formationTitle, (pageWidth - formationWidth) / 2, 125);
+          "Professional Development Course";
 
+        doc.setFontSize(24);
+        doc.setTextColor(139, 69, 19);
+        doc.setFont("times", "bold");
+        const courseWidth = doc.getTextWidth(formationTitle);
+        doc.text(formationTitle, (pageWidth - courseWidth) / 2, courseY);
+
+        // Course domain badge with spacing
+        let domainY = courseY + 15;
         if (certificate.formationEntity?.domaine) {
-          doc.setFillColor(220, 252, 231);
-          doc.setDrawColor(5, 150, 105);
-          doc.setLineWidth(1);
           const domainText = certificate.formationEntity.domaine.toUpperCase();
           const domainWidth = doc.getTextWidth(domainText) + 20;
+
+          // Beautiful badge design
+          doc.setFillColor(239, 246, 255);
+          doc.setDrawColor(37, 99, 235);
+          doc.setLineWidth(1);
           doc.roundedRect(
             (pageWidth - domainWidth) / 2,
-            135,
+            domainY - 8,
             domainWidth,
-            12,
-            3,
-            3,
+            16,
+            5,
+            5,
             "FD"
           );
 
-          doc.setFontSize(10);
-          doc.setTextColor(5, 150, 105);
+          doc.setFontSize(12);
+          doc.setTextColor(37, 99, 235);
           doc.setFont("helvetica", "bold");
           doc.text(
             domainText,
             (pageWidth - doc.getTextWidth(domainText)) / 2,
-            143
+            domainY
           );
+
+          domainY += 20; // Add spacing after domain
         }
 
-        doc.setFontSize(14);
-        doc.setTextColor(60, 60, 60);
-        doc.setFont("helvetica", "normal");
-
+        // Date section with proper spacing
         let certificateDate = new Date();
         if (certificate.dateObtention) {
           certificateDate = new Date(certificate.dateObtention);
         }
 
-        const formattedDate = certificateDate.toLocaleDateString("fr-FR", {
+        const formattedDate = certificateDate.toLocaleDateString("en-US", {
           year: "numeric",
           month: "long",
           day: "numeric",
         });
 
-        const dateText = `Délivré le ${formattedDate}`;
+        const dateY = domainY + 15;
+        doc.setFontSize(14);
+        doc.setTextColor(107, 114, 128);
+        doc.setFont("times", "italic");
+        const dateText = `Issued on ${formattedDate}`;
         const dateWidth = doc.getTextWidth(dateText);
-        doc.text(dateText, (pageWidth - dateWidth) / 2, 165);
+        doc.text(dateText, (pageWidth - dateWidth) / 2, dateY);
 
+        // Signature section with proper spacing and layout
+        const signatureY = pageHeight - 50;
+
+        // Left signature - Instructor
         if (certificate.formationEntity?.formateur?.nom) {
+          const leftSigX = 60;
+
           doc.setFontSize(12);
-          doc.setTextColor(60, 60, 60);
-          doc.setFont("helvetica", "normal");
+          doc.setTextColor(107, 114, 128);
+          doc.setFont("times", "normal");
+          doc.text("Course Instructor", leftSigX - 10, signatureY - 15);
 
-          const instructorText = "Formateur:";
-          doc.text(instructorText, pageWidth - 80, pageHeight - 40);
-
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(5, 150, 105);
+          doc.setFontSize(16);
+          doc.setFont("times", "bold");
+          doc.setTextColor(37, 99, 235);
           doc.text(
             certificate.formationEntity.formateur.nom,
-            pageWidth - 80,
-            pageHeight - 30
+            leftSigX - 10,
+            signatureY
           );
 
+          // Signature line
           doc.setLineWidth(1);
-          doc.setDrawColor(180, 180, 180);
+          doc.setDrawColor(107, 114, 128);
           doc.line(
-            pageWidth - 80,
-            pageHeight - 25,
-            pageWidth - 20,
-            pageHeight - 25
+            leftSigX - 10,
+            signatureY + 5,
+            leftSigX + 60,
+            signatureY + 5
           );
         }
 
-        doc.setFontSize(8);
-        doc.setTextColor(120, 120, 120);
-        doc.setFont("helvetica", "normal");
-        const certId = certificate.id ? certificate.id.substring(0, 8) : "N/A";
-        doc.text(`ID: ${certId}`, 20, pageHeight - 20);
+        // Right signature - Academic Director
+        const rightSigX = pageWidth - 120;
 
-        doc.setFillColor(245, 158, 11, 0.1);
-        doc.circle(pageWidth - 50, 50, 20, "F");
-        doc.setDrawColor(245, 158, 11);
-        doc.setLineWidth(2);
-        doc.circle(pageWidth - 50, 50, 20);
+        doc.setFontSize(12);
+        doc.setTextColor(107, 114, 128);
+        doc.setFont("times", "normal");
+        doc.text("Academic Director", rightSigX, signatureY - 15);
 
-        doc.setFontSize(10);
-        doc.setTextColor(245, 158, 11);
-        doc.setFont("helvetica", "bold");
-        const sealText = "CERTIFIÉ";
-        const sealWidth = doc.getTextWidth(sealText);
-        doc.text(sealText, pageWidth - 50 - sealWidth / 2, 52);
+        doc.setLineWidth(1);
+        doc.setDrawColor(107, 114, 128);
+        doc.line(rightSigX, signatureY + 5, rightSigX + 70, signatureY + 5);
 
-        const fileName_clean = fileName.replace(/[^a-zA-Z0-9]/g, "_");
-        const participantName_clean = (
-          certificate.nomParticipant || "Participant"
-        ).replace(/\s+/g, "_");
+        // QR Code section with proper spacing
+        const qrCodeUrl =
+          "http://localhost:3000/dashboard/participant/certificates";
 
-        doc.save(`Certificat_${fileName_clean}_${participantName_clean}.pdf`);
+        QRCode.toDataURL(qrCodeUrl, {
+          width: 180,
+          margin: 1,
+          color: { dark: "#2563eb", light: "#ffffff" },
+        })
+          .then((qrCodeDataUrl) => {
+            const qrX = pageWidth - 80;
+            const qrY = 85;
 
-        console.log("Certificate PDF generated successfully");
+            // QR Code beautiful frame
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(139, 69, 19);
+            doc.setLineWidth(2);
+            doc.roundedRect(qrX - 5, qrY - 5, 40, 40, 5, 5, "FD");
+
+            // Add QR code
+            doc.addImage(qrCodeDataUrl, "PNG", qrX, qrY, 30, 30);
+
+            // QR Code label with spacing
+            doc.setFontSize(10);
+            doc.setTextColor(107, 114, 128);
+            doc.setFont("helvetica", "normal");
+            doc.text("Verify Online", qrX - 2, qrY + 40);
+
+            // Certificate ID with proper spacing
+            doc.setFontSize(10);
+            doc.setTextColor(156, 163, 175);
+            doc.setFont("times", "normal");
+            const certId = certificate.id
+              ? certificate.id.substring(0, 8).toUpperCase()
+              : "EDU12345";
+            doc.text(`Certificate ID: ${certId}`, 30, pageHeight - 20);
+
+            // Corner decorative elements - elegant and spaced
+            const cornerSize = 20;
+            doc.setLineWidth(2);
+            doc.setDrawColor(139, 69, 19);
+
+            // Top corners
+            doc.line(25, 40, 25 + cornerSize, 40);
+            doc.line(25, 40, 25, 40 + cornerSize);
+            doc.line(pageWidth - 25, 40, pageWidth - 25 - cornerSize, 40);
+            doc.line(pageWidth - 25, 40, pageWidth - 25, 40 + cornerSize);
+
+            // Bottom corners
+            doc.line(25, pageHeight - 40, 25 + cornerSize, pageHeight - 40);
+            doc.line(25, pageHeight - 40, 25, pageHeight - 40 - cornerSize);
+            doc.line(
+              pageWidth - 25,
+              pageHeight - 40,
+              pageWidth - 25 - cornerSize,
+              pageHeight - 40
+            );
+            doc.line(
+              pageWidth - 25,
+              pageHeight - 40,
+              pageWidth - 25,
+              pageHeight - 40 - cornerSize
+            );
+
+            // Add small decorative dots at corners
+            doc.setFillColor(37, 99, 235);
+            doc.circle(25 + cornerSize, 40 + cornerSize, 2, "F");
+            doc.circle(pageWidth - 25 - cornerSize, 40 + cornerSize, 2, "F");
+            doc.circle(25 + cornerSize, pageHeight - 40 - cornerSize, 2, "F");
+            doc.circle(
+              pageWidth - 25 - cornerSize,
+              pageHeight - 40 - cornerSize,
+              2,
+              "F"
+            );
+
+            // Save the PDF
+            const fileName_clean = fileName.replace(/[^a-zA-Z0-9]/g, "_");
+            const participantName_clean = (
+              certificate.nomParticipant || "Participant"
+            ).replace(/\s+/g, "_");
+
+            doc.save(
+              `eduPlatform_Certificate_${fileName_clean}_${participantName_clean}.pdf`
+            );
+            console.log(
+              "Beautiful formal certificate PDF generated successfully"
+            );
+          })
+          .catch((qrError) => {
+            console.error("Error generating QR code:", qrError);
+            // Continue without QR code
+            const fileName_clean = fileName.replace(/[^a-zA-Z0-9]/g, "_");
+            const participantName_clean = (
+              certificate.nomParticipant || "Participant"
+            ).replace(/\s+/g, "_");
+
+            doc.save(
+              `eduPlatform_Certificate_${fileName_clean}_${participantName_clean}.pdf`
+            );
+            console.log(
+              "Certificate PDF generated successfully (without QR code)"
+            );
+          });
       })
       .catch((error) => {
         console.error("Error generating PDF certificate:", error);
@@ -442,6 +643,16 @@ export default function CertificatesList() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedCertificateId(null);
+  };
+
+  const getImageUrl = (imageName: string | null | undefined) => {
+    if (!imageName) return null;
+
+    if (imageName.startsWith("http") || imageName.startsWith("/uploads/")) {
+      return imageName;
+    }
+
+    return `/uploads/${imageName}`;
   };
 
   const formatDate = (date: string) => {
@@ -549,10 +760,12 @@ export default function CertificatesList() {
               className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group"
             >
               <div
-                className="h-48 bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 relative overflow-hidden"
+                className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden"
                 style={{
                   backgroundImage: certificate.formationEntity?.image
-                    ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${certificate.formationEntity.image})`
+                    ? `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${getImageUrl(
+                        certificate.formationEntity?.image
+                      )})`
                     : undefined,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
@@ -573,7 +786,7 @@ export default function CertificatesList() {
                   </h3>
                   <p className="text-white/90 text-sm">
                     Par{" "}
-                    {certificate.formationEntity?.formateur?.nom ||
+                    {certificate.formationEntity?.user?.name ||
                       "Formateur inconnu"}
                   </p>
                 </div>

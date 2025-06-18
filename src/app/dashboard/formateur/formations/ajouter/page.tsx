@@ -18,6 +18,7 @@ import {
   Link2Icon,
   MailIcon,
   CheckIcon,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useRouter } from "next/navigation";
@@ -60,6 +61,26 @@ interface ModuleData {
   }[];
 }
 
+interface Question {
+  id: string;
+  type: "multiple-choice" | "true-false" | "short-answer";
+  question: string;
+  options?: string[];
+  correctAnswer: string;
+  points: number;
+  explanation?: string;
+  order: number;
+}
+
+interface EvaluationTest {
+  isEnabled: boolean;
+  title: string;
+  timeLimit: number;
+  passingScore: number;
+  description: string;
+  questions: Question[];
+}
+
 interface FormData {
   titre: string;
   domaine: string;
@@ -69,6 +90,7 @@ interface FormData {
   accessType: string;
   userId: string;
   modules: ModuleData[];
+  evaluationTest?: EvaluationTest;
 }
 
 interface FormationCreatorProps {
@@ -114,13 +136,31 @@ const FormationCreator = ({
     accessType: "public",
     userId: user?.role === "formateur" ? user.id : "",
     modules: [],
+    evaluationTest: {
+      isEnabled: false,
+      title: "",
+      timeLimit: 60,
+      passingScore: 70,
+      description: "",
+      questions: [],
+    },
   });
+
   const [invitationData, setInvitationData] = useState({
     mode: "email",
     emails: [""],
     invitationLink: "",
     linkGenerated: false,
     csvFile: null as File | null,
+  });
+
+  const [currentQuestion, setCurrentQuestion] = useState<Partial<Question>>({
+    type: "multiple-choice",
+    question: "",
+    options: ["", "", "", ""],
+    correctAnswer: "0",
+    points: 1,
+    explanation: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -133,9 +173,11 @@ const FormationCreator = ({
   const [error, setError] = useState<string | null>(null);
   const [savingResource, setSavingResource] = useState<string | null>(null);
   const [isCreatingInvitation, setIsCreatingInvitation] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<string | null>(null);
   const [isSubmitting] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
+  const API_BASE_URL = "http://127.0.0.1:3001";
 
   const steps = [
     {
@@ -152,11 +194,17 @@ const FormationCreator = ({
     },
     {
       number: 3,
+      title: "Evaluation Test",
+      icon: ClipboardList,
+      description: "Assessment & quiz",
+    },
+    {
+      number: 4,
       title: "Settings",
       icon: Settings,
       description: "Access & invitations",
     },
-    { number: 4, title: "Preview", icon: Eye, description: "Review & publish" },
+    { number: 5, title: "Preview", icon: Eye, description: "Review & publish" },
   ];
 
   const HorizontalTimeline = () => (
@@ -270,6 +318,23 @@ const FormationCreator = ({
       const modulesData = allModules.filter(
         (module: any) => module.formationId === id
       );
+
+      let evaluationTest: EvaluationTest = {
+        isEnabled: false,
+        title: "",
+        timeLimit: 60,
+        passingScore: 70,
+        description: "",
+        questions: [],
+      };
+
+      if (formationData.evaluationTest) {
+        evaluationTest = {
+          ...evaluationTest,
+          ...formationData.evaluationTest,
+          questions: formationData.evaluationTest.questions || [],
+        };
+      }
 
       // Fetch all resources and quizzes once
       const [resourcesResponse, quizzesResponse] = await Promise.all([
@@ -410,6 +475,7 @@ const FormationCreator = ({
         accessType: formationData.accessType || "public",
         userId: formationData.userId || "",
         modules: modulesWithDetails,
+        evaluationTest: evaluationTest,
       });
 
       setInvitationData(invitationInfo);
@@ -463,6 +529,54 @@ const FormationCreator = ({
 
     fetchFormateurs();
   }, []);
+
+  useEffect(() => {
+    if (formData.evaluationTest?.isEnabled && formationId) {
+      if (!formData.evaluationTest.questions) {
+        setFormData((prev) => ({
+          ...prev,
+          evaluationTest: {
+            ...prev.evaluationTest!,
+            questions: [],
+          },
+        }));
+      }
+      loadQuestions();
+    }
+  }, [formData.evaluationTest?.isEnabled, formationId]);
+
+  const loadQuestions = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `${API_BASE_URL}/questions/formation/${formationId}?includeAnswers=true`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to load questions: ${response.statusText}`);
+      }
+
+      const questions = await response.json();
+
+      setFormData((prev) => ({
+        ...prev,
+        evaluationTest: {
+          ...prev.evaluationTest!,
+          questions: Array.isArray(questions) ? questions : [],
+        },
+      }));
+    } catch (err) {
+      console.error("Error loading questions:", err);
+      setError(err instanceof Error ? err.message : "Failed to load questions");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleImageChange = (file: File | null) => {
     setImageFile(file);
@@ -676,93 +790,394 @@ const FormationCreator = ({
     }));
   };
 
-  const addQuestion = (moduleIndex: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      modules: prev.modules.map((module, i) =>
-        i === moduleIndex
-          ? {
-              ...module,
-              questions: [
-                ...(module.questions || []),
-                {
-                  question: "",
-                  options: ["", "", "", ""],
-                  correctAnswer: 0,
-                },
-              ],
-            }
-          : module
-      ),
-    }));
+  const createQuestion = async () => {
+    if (!currentQuestion.question?.trim()) {
+      setError("Question text is required");
+      return;
+    }
+
+    // Validate based on question type
+    if (currentQuestion.type === "multiple-choice") {
+      const validOptions =
+        currentQuestion.options?.filter((opt) => opt.trim()) || [];
+      if (validOptions.length < 2) {
+        setError("Multiple choice questions need at least 2 options");
+        return;
+      }
+      if (!currentQuestion.correctAnswer) {
+        setError("Please select the correct answer");
+        return;
+      }
+    }
+
+    if (currentQuestion.type === "true-false") {
+      if (!currentQuestion.correctAnswer) {
+        setError("Please select True or False");
+        return;
+      }
+    }
+
+    if (currentQuestion.type === "short-answer") {
+      if (!currentQuestion.correctAnswer?.trim()) {
+        setError("Sample answer is required for short answer questions");
+        return;
+      }
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Prepare the question data
+      const questionData = {
+        type: currentQuestion.type!,
+        question: currentQuestion.question!,
+        options:
+          currentQuestion.type === "multiple-choice"
+            ? currentQuestion.options?.filter((opt) => opt.trim())
+            : undefined,
+        correctAnswer: currentQuestion.correctAnswer!,
+        points: currentQuestion.points || 1,
+        explanation: currentQuestion.explanation || undefined,
+        formationId: formationId,
+        order: (formData.evaluationTest?.questions.length || 0) + 1,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/questions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(questionData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message ||
+            `Failed to create question: ${response.statusText}`
+        );
+      }
+
+      const createdQuestion = await response.json();
+
+      // Add the new question to the local state
+      setFormData((prev) => ({
+        ...prev,
+        evaluationTest: {
+          ...prev.evaluationTest!,
+          questions: [
+            ...(prev.evaluationTest?.questions || []),
+            createdQuestion,
+          ],
+        },
+      }));
+
+      // Reset the form
+      setCurrentQuestion({
+        type: "multiple-choice",
+        question: "",
+        options: ["", "", "", ""],
+        correctAnswer: "0",
+        points: 1,
+        explanation: "",
+      });
+    } catch (err) {
+      console.error("Error creating question:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to create question"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const removeQuestion = (moduleIndex: number, questionIndex: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      modules: prev.modules.map((module, i) =>
-        i === moduleIndex
-          ? {
-              ...module,
-              questions:
-                module.questions?.filter((_, qi) => qi !== questionIndex) || [],
-            }
-          : module
-      ),
-    }));
-  };
-
-  const updateQuestion = (
-    moduleIndex: number,
-    questionIndex: number,
-    field: string,
-    value: string | number
+  const updateQuestion = async (
+    questionId: string,
+    questionData: Partial<Question>
   ) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(questionData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message ||
+            `Failed to update question: ${response.statusText}`
+        );
+      }
+
+      const updatedQuestion = await response.json();
+
+      // Update the question in local state
+      setFormData((prev) => ({
+        ...prev,
+        evaluationTest: {
+          ...prev.evaluationTest!,
+          questions: (prev.evaluationTest?.questions || []).map((q) =>
+            q.id === questionId ? updatedQuestion : q
+          ),
+        },
+      }));
+
+      setEditingQuestion(null);
+    } catch (err) {
+      console.error("Error updating question:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to update question"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteQuestion = async (questionId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete question: ${response.statusText}`);
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        evaluationTest: {
+          ...prev.evaluationTest!,
+          questions: (prev.evaluationTest?.questions || []).filter(
+            (q) => q.id !== questionId
+          ),
+        },
+      }));
+    } catch (err) {
+      console.error("Error deleting question:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to delete question"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateEvaluationSettings = (updates: Partial<EvaluationTest>) => {
     setFormData((prev) => ({
       ...prev,
-      modules: prev.modules.map((module, i) =>
-        i === moduleIndex
-          ? {
-              ...module,
-              questions:
-                module.questions?.map((question, qi) =>
-                  qi === questionIndex
-                    ? { ...question, [field]: value }
-                    : question
-                ) || [],
-            }
-          : module
-      ),
+      evaluationTest: {
+        ...prev.evaluationTest!,
+        ...updates,
+        // Ensure questions array is preserved
+        questions: updates.questions || prev.evaluationTest?.questions || [],
+      },
     }));
   };
 
-  const updateQuestionOption = (
-    moduleIndex: number,
-    questionIndex: number,
-    optionIndex: number,
-    value: string
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      modules: prev.modules.map((module, i) =>
-        i === moduleIndex
-          ? {
-              ...module,
-              questions:
-                module.questions?.map((question, qi) =>
-                  qi === questionIndex
-                    ? {
-                        ...question,
-                        options: question.options.map((option, oi) =>
-                          oi === optionIndex ? value : option
-                        ),
-                      }
-                    : question
-                ) || [],
-            }
-          : module
-      ),
-    }));
+  const EditableQuestion = ({
+    question,
+    onSave,
+    onCancel,
+  }: {
+    question: Question;
+    onSave: (data: Partial<Question>) => void;
+    onCancel: () => void;
+  }) => {
+    const [editData, setEditData] = useState<Partial<Question>>({
+      ...question,
+      options: question.options || ["", "", "", ""],
+    });
+
+    return (
+      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Question Type
+            </label>
+            <select
+              value={editData.type}
+              onChange={(e) =>
+                setEditData((prev) => ({
+                  ...prev,
+                  type: e.target.value as Question["type"],
+                }))
+              }
+              className="w-full p-2 border rounded"
+            >
+              <option value="multiple-choice">Multiple Choice</option>
+              <option value="true-false">True/False</option>
+              <option value="short-answer">Short Answer</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Question</label>
+            <textarea
+              value={editData.question || ""}
+              onChange={(e) =>
+                setEditData((prev) => ({ ...prev, question: e.target.value }))
+              }
+              className="w-full p-2 border rounded"
+              rows={2}
+            />
+          </div>
+
+          {editData.type === "multiple-choice" && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Options</label>
+              {(editData.options || ["", "", "", ""]).map((option, index) => (
+                <div key={index} className="flex items-center space-x-2 mb-2">
+                  <input
+                    type="radio"
+                    name="editCorrectAnswer"
+                    checked={editData.correctAnswer === index.toString()}
+                    onChange={() =>
+                      setEditData((prev) => ({
+                        ...prev,
+                        correctAnswer: index.toString(),
+                      }))
+                    }
+                    className="w-4 h-4"
+                  />
+                  <input
+                    type="text"
+                    value={option}
+                    onChange={(e) => {
+                      const newOptions = [
+                        ...(editData.options || ["", "", "", ""]),
+                      ];
+                      newOptions[index] = e.target.value;
+                      setEditData((prev) => ({ ...prev, options: newOptions }));
+                    }}
+                    className="flex-1 p-2 border rounded"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {editData.type === "true-false" && (
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Correct Answer
+              </label>
+              <div className="flex space-x-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={editData.correctAnswer === "true"}
+                    onChange={() =>
+                      setEditData((prev) => ({
+                        ...prev,
+                        correctAnswer: "true",
+                      }))
+                    }
+                    className="mr-2"
+                  />
+                  True
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    checked={editData.correctAnswer === "false"}
+                    onChange={() =>
+                      setEditData((prev) => ({
+                        ...prev,
+                        correctAnswer: "false",
+                      }))
+                    }
+                    className="mr-2"
+                  />
+                  False
+                </label>
+              </div>
+            </div>
+          )}
+
+          {editData.type === "short-answer" && (
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Correct Answer
+              </label>
+              <textarea
+                value={editData.correctAnswer || ""}
+                onChange={(e) =>
+                  setEditData((prev) => ({
+                    ...prev,
+                    correctAnswer: e.target.value,
+                  }))
+                }
+                className="w-full p-2 border rounded"
+                rows={2}
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Points</label>
+            <input
+              type="number"
+              value={editData.points || 1}
+              onChange={(e) =>
+                setEditData((prev) => ({
+                  ...prev,
+                  points: parseInt(e.target.value) || 1,
+                }))
+              }
+              min="1"
+              className="w-full p-2 border rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Explanation
+            </label>
+            <textarea
+              value={editData.explanation || ""}
+              onChange={(e) =>
+                setEditData((prev) => ({
+                  ...prev,
+                  explanation: e.target.value,
+                }))
+              }
+              className="w-full p-2 border rounded"
+              rows={2}
+            />
+          </div>
+
+          <div className="flex space-x-2">
+            <button
+              onClick={() => onSave(editData)}
+              disabled={loading}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-300"
+            >
+              {loading ? "Saving..." : "Save"}
+            </button>
+            <button
+              onClick={onCancel}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const canProceed = (step: number) => {
@@ -770,11 +1185,11 @@ const FormationCreator = ({
       case 1:
         return (
           formData.titre.trim() &&
-            formData.domaine.trim() &&
-            formData.description.trim() &&
-            formData.objectifs.trim() &&
-            formData.accessType &&
-            formData.userId.trim() !== "",
+          formData.domaine.trim() &&
+          formData.description.trim() &&
+          formData.objectifs.trim() &&
+          formData.accessType &&
+          formData.userId.trim() !== "" &&
           !loading
         );
       case 2:
@@ -785,6 +1200,15 @@ const FormationCreator = ({
             (module) => module.titre && module.titre.trim()
           )
         );
+      case 3:
+        return (
+          !formData.evaluationTest?.isEnabled ||
+          (formData.evaluationTest?.isEnabled &&
+            formData.evaluationTest.title.trim() &&
+            (formData.evaluationTest.questions?.length || 0) > 0)
+        );
+      case 4:
+        return true;
       default:
         return true;
     }
@@ -1230,7 +1654,7 @@ const FormationCreator = ({
         }
       }
 
-      setCurrentStep(4);
+      setCurrentStep(5);
     } catch (error) {
       console.error("Error updating formation:", error);
     } finally {
@@ -1245,66 +1669,66 @@ const FormationCreator = ({
     return undefined;
   };
 
-  const saveQuizQuestions = async (
-    moduleId: string,
-    questions:
-      | { question: string; options: string[]; correctAnswer: number }[]
-      | undefined
-  ) => {
-    try {
-      // Use the correct formation ID based on mode
-      const formationIdToUse =
-        mode === "edit" ? currentFormationId : formationId;
+  // const saveQuizQuestions = async (
+  //   moduleId: string,
+  //   questions:
+  //     | { question: string; options: string[]; correctAnswer: number }[]
+  //     | undefined
+  // ) => {
+  //   try {
+  //     // Use the correct formation ID based on mode
+  //     const formationIdToUse =
+  //       mode === "edit" ? currentFormationId : formationId;
 
-      if (!formationIdToUse) {
-        throw new Error("Formation ID is required");
-      }
+  //     if (!formationIdToUse) {
+  //       throw new Error("Formation ID is required");
+  //     }
 
-      if (!questions || questions.length === 0) {
-        throw new Error("No questions to save");
-      }
+  //     if (!questions || questions.length === 0) {
+  //       throw new Error("No questions to save");
+  //     }
 
-      const validQuestions = questions.filter(
-        (q) =>
-          q.question &&
-          q.question.trim() &&
-          q.options &&
-          q.options.length === 4 &&
-          q.options.every((opt: string) => opt.trim()) &&
-          typeof q.correctAnswer === "number"
-      );
+  //     const validQuestions = questions.filter(
+  //       (q) =>
+  //         q.question &&
+  //         q.question.trim() &&
+  //         q.options &&
+  //         q.options.length === 4 &&
+  //         q.options.every((opt: string) => opt.trim()) &&
+  //         typeof q.correctAnswer === "number"
+  //     );
 
-      if (validQuestions.length === 0) {
-        throw new Error(
-          "No valid questions found. Please ensure all questions have text, 4 options, and a correct answer selected."
-        );
-      }
+  //     if (validQuestions.length === 0) {
+  //       throw new Error(
+  //         "No valid questions found. Please ensure all questions have text, 4 options, and a correct answer selected."
+  //       );
+  //     }
 
-      const response = await fetch("/api/quiz/add", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          formationId: formationIdToUse, // Use the correct formation ID
-          moduleId: moduleId,
-          questions: validQuestions,
-        }),
-      });
+  //     const response = await fetch("/api/quiz/add", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({
+  //         formationId: formationIdToUse, // Use the correct formation ID
+  //         moduleId: moduleId,
+  //         questions: validQuestions,
+  //       }),
+  //     });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to save quiz questions");
-      }
+  //     if (!response.ok) {
+  //       const errorData = await response.json();
+  //       throw new Error(errorData.message || "Failed to save quiz questions");
+  //     }
 
-      const result = await response.json();
-      return result.data;
-    } catch (error) {
-      throw error instanceof Error
-        ? error
-        : new Error("An unexpected error occurred while saving quiz questions");
-    }
-  };
+  //     const result = await response.json();
+  //     return result.data;
+  //   } catch (error) {
+  //     throw error instanceof Error
+  //       ? error
+  //       : new Error("An unexpected error occurred while saving quiz questions");
+  //   }
+  // };
 
   if (loading && mode === "edit") {
     return (
@@ -1686,7 +2110,7 @@ const FormationCreator = ({
                         </div>
 
                         {/* Questions Section */}
-                        <div className="mt-4 p-4 bg-white rounded-lg border border-gray-100">
+                        {/* <div className="mt-4 p-4 bg-white rounded-lg border border-gray-100">
                           <div className="flex items-center justify-between mb-4">
                             <h5 className="text-md font-medium text-gray-800 flex items-center gap-2">
                               <HelpCircleIcon
@@ -1846,7 +2270,7 @@ const FormationCreator = ({
                               <p className="text-sm">No questions added yet</p>
                             </div>
                           )}
-                        </div>
+                        </div> */}
                       </div>
                     ))}
                   </div>
@@ -1878,6 +2302,420 @@ const FormationCreator = ({
           </div>
         )}
         {currentStep === 3 && (
+          <div className="space-y-6 max-w-4xl mx-auto p-6">
+            <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+              <h3 className="text-lg font-semibold text-blue-800 mb-2">
+                📊 Evaluation Test
+              </h3>
+              <p className="text-blue-700">
+                Create an assessment to test participants&apos; understanding
+                and knowledge level. This helps ensure learning objectives are
+                met and provides valuable feedback.
+              </p>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
+
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="enableEvaluation"
+                checked={formData.evaluationTest?.isEnabled || false}
+                onChange={(e) =>
+                  updateEvaluationSettings({ isEnabled: e.target.checked })
+                }
+                className="w-5 h-5 text-blue-600 rounded"
+              />
+              <label htmlFor="enableEvaluation" className="text-lg font-medium">
+                Enable Evaluation Test for this Formation
+              </label>
+            </div>
+
+            {formData.evaluationTest?.isEnabled && (
+              <div className="space-y-6 border-t pt-6">
+                {/* Test Settings */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Test Title
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.evaluationTest?.title}
+                      onChange={(e) =>
+                        updateEvaluationSettings({ title: e.target.value })
+                      }
+                      placeholder="e.g., Final Assessment"
+                      className="w-full p-3 border rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Time Limit (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.evaluationTest.timeLimit}
+                      onChange={(e) =>
+                        updateEvaluationSettings({
+                          timeLimit: parseInt(e.target.value),
+                        })
+                      }
+                      min="1"
+                      className="w-full p-3 border rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Passing Score (%)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.evaluationTest.passingScore}
+                      onChange={(e) =>
+                        updateEvaluationSettings({
+                          passingScore: parseInt(e.target.value),
+                        })
+                      }
+                      min="0"
+                      max="100"
+                      className="w-full p-3 border rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      value={formData.evaluationTest.description}
+                      onChange={(e) =>
+                        updateEvaluationSettings({
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Brief description of the test..."
+                      rows={3}
+                      className="w-full p-3 border rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                {/* Questions List */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-lg font-semibold">
+                      Questions (
+                      {formData.evaluationTest.questions?.length || 0})
+                    </h4>
+                    {loading && <div className="text-blue-600">Loading...</div>}
+                  </div>
+
+                  <div className="space-y-3 mb-6">
+                    {formData.evaluationTest.questions.map(
+                      (question, index) => (
+                        <div key={question.id}>
+                          {editingQuestion === question.id ? (
+                            <EditableQuestion
+                              question={question}
+                              onSave={(data) =>
+                                updateQuestion(question.id, data)
+                              }
+                              onCancel={() => setEditingQuestion(null)}
+                            />
+                          ) : (
+                            <div className="bg-gray-50 p-4 rounded-lg flex justify-between items-start">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+                                    Q{index + 1}
+                                  </span>
+                                  <span className="bg-gray-200 px-2 py-1 rounded text-sm">
+                                    {question.type}
+                                  </span>
+                                  <span className="text-sm text-gray-600">
+                                    {question.points} point
+                                    {question.points !== 1 ? "s" : ""}
+                                  </span>
+                                </div>
+                                <p className="font-medium">
+                                  {question.question}
+                                </p>
+                                {question.type === "multiple-choice" &&
+                                  question.options && (
+                                    <div className="mt-2 text-sm">
+                                      {question.options.map(
+                                        (option, optIndex) => (
+                                          <div
+                                            key={optIndex}
+                                            className={`ml-4 ${
+                                              question.correctAnswer ===
+                                              optIndex.toString()
+                                                ? "font-semibold text-green-600"
+                                                : ""
+                                            }`}
+                                          >
+                                            {optIndex + 1}. {option}{" "}
+                                            {question.correctAnswer ===
+                                              optIndex.toString() && "✓"}
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  )}
+                                {question.type === "true-false" && (
+                                  <div className="mt-2 text-sm text-green-600 font-semibold">
+                                    Correct:{" "}
+                                    {question.correctAnswer === "true"
+                                      ? "True"
+                                      : "False"}
+                                  </div>
+                                )}
+                                {question.explanation && (
+                                  <div className="mt-2 text-sm text-gray-600 italic">
+                                    Explanation: {question.explanation}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex space-x-2 ml-4">
+                                <button
+                                  onClick={() =>
+                                    setEditingQuestion(question.id)
+                                  }
+                                  className="text-blue-500 hover:text-blue-700"
+                                  title="Edit question"
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  onClick={() => deleteQuestion(question.id)}
+                                  className="text-red-500 hover:text-red-700"
+                                  title="Delete question"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  {/* Add Question Form */}
+                  <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6">
+                    <h5 className="font-semibold mb-4">Add New Question</h5>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Question Type
+                          </label>
+                          <select
+                            value={currentQuestion.type}
+                            onChange={(e) =>
+                              setCurrentQuestion((prev) => ({
+                                ...prev,
+                                type: e.target.value as Question["type"],
+                              }))
+                            }
+                            className="w-full p-3 border rounded-lg"
+                          >
+                            <option value="multiple-choice">
+                              Multiple Choice
+                            </option>
+                            <option value="true-false">True/False</option>
+                            <option value="short-answer">Short Answer</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Points
+                          </label>
+                          <input
+                            type="number"
+                            value={currentQuestion.points}
+                            onChange={(e) =>
+                              setCurrentQuestion((prev) => ({
+                                ...prev,
+                                points: parseInt(e.target.value) || 1,
+                              }))
+                            }
+                            min="1"
+                            className="w-full p-3 border rounded-lg"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Question
+                        </label>
+                        <textarea
+                          value={currentQuestion.question}
+                          onChange={(e) =>
+                            setCurrentQuestion((prev) => ({
+                              ...prev,
+                              question: e.target.value,
+                            }))
+                          }
+                          placeholder="Enter your question here..."
+                          rows={2}
+                          className="w-full p-3 border rounded-lg"
+                        />
+                      </div>
+
+                      {currentQuestion.type === "multiple-choice" && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Answer Options
+                          </label>
+                          <div className="space-y-2">
+                            {currentQuestion.options?.map((option, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center space-x-2"
+                              >
+                                <input
+                                  type="radio"
+                                  name="correctAnswer"
+                                  checked={
+                                    currentQuestion.correctAnswer ===
+                                    index.toString()
+                                  }
+                                  onChange={() =>
+                                    setCurrentQuestion((prev) => ({
+                                      ...prev,
+                                      correctAnswer: index.toString(),
+                                    }))
+                                  }
+                                  className="w-4 h-4 text-blue-600"
+                                />
+                                <input
+                                  type="text"
+                                  value={option}
+                                  onChange={(e) => {
+                                    const newOptions = [
+                                      ...(currentQuestion.options || []),
+                                    ];
+                                    newOptions[index] = e.target.value;
+                                    setCurrentQuestion((prev) => ({
+                                      ...prev,
+                                      options: newOptions,
+                                    }));
+                                  }}
+                                  placeholder={`Option ${index + 1}`}
+                                  className="flex-1 p-2 border rounded"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {currentQuestion.type === "true-false" && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Correct Answer
+                          </label>
+                          <div className="flex space-x-4">
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                name="tfAnswer"
+                                checked={
+                                  currentQuestion.correctAnswer === "true"
+                                }
+                                onChange={() =>
+                                  setCurrentQuestion((prev) => ({
+                                    ...prev,
+                                    correctAnswer: "true",
+                                  }))
+                                }
+                                className="mr-2"
+                              />
+                              True
+                            </label>
+                            <label className="flex items-center">
+                              <input
+                                type="radio"
+                                name="tfAnswer"
+                                checked={
+                                  currentQuestion.correctAnswer === "false"
+                                }
+                                onChange={() =>
+                                  setCurrentQuestion((prev) => ({
+                                    ...prev,
+                                    correctAnswer: "false",
+                                  }))
+                                }
+                                className="mr-2"
+                              />
+                              False
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {currentQuestion.type === "short-answer" && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Sample Answer
+                          </label>
+                          <textarea
+                            value={currentQuestion.correctAnswer}
+                            onChange={(e) =>
+                              setCurrentQuestion((prev) => ({
+                                ...prev,
+                                correctAnswer: e.target.value,
+                              }))
+                            }
+                            placeholder="Provide a sample correct answer..."
+                            rows={2}
+                            className="w-full p-3 border rounded-lg"
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Explanation (Optional)
+                        </label>
+                        <textarea
+                          value={currentQuestion.explanation}
+                          onChange={(e) =>
+                            setCurrentQuestion((prev) => ({
+                              ...prev,
+                              explanation: e.target.value,
+                            }))
+                          }
+                          placeholder="Explain the correct answer..."
+                          rows={2}
+                          className="w-full p-3 border rounded-lg"
+                        />
+                      </div>
+
+                      <button
+                        onClick={createQuestion}
+                        disabled={!currentQuestion.question?.trim() || loading}
+                        className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 font-medium"
+                      >
+                        {loading ? "Creating Question..." : "Create Question"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {currentStep === 4 && (
           <StepWrapper
             title="Access Settings"
             subtitle="Configure who can access your formation"
@@ -2109,14 +2947,14 @@ const FormationCreator = ({
             </div>
           </StepWrapper>
         )}
-        {currentStep === 4 && (
+        {currentStep === 5 && (
           <StepWrapper
             title="Review & Publish"
             subtitle="Review your formation before publishing"
           >
             <div className="flex gap-4 pt-6">
               <button
-                onClick={() => setCurrentStep(3)}
+                onClick={() => setCurrentStep(4)}
                 className={`${buttonClass} bg-gray-100 text-gray-700 hover:bg-gray-200`}
               >
                 <ArrowLeftIcon size={20} />

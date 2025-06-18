@@ -7,6 +7,7 @@ import {
   FilesIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
+  UserCheckIcon,
 } from "lucide-react";
 import Link from "next/link";
 import React, { useState } from "react";
@@ -34,12 +35,6 @@ const Sidebar = () => {
       icon: CalendarIcon,
       href: "/dashboard/participant/calendrier",
     },
-    // {
-    //   id: "formateurs",
-    //   label: "Formateurs",
-    //   icon: UserCheckIcon,
-    //   href: "/dashboard/formateur/formateurs",
-    // },
     {
       id: "participants",
       label: "Participants",
@@ -87,8 +82,39 @@ const Sidebar = () => {
     },
   ];
 
+  const menuItemsAdmin = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboardIcon,
+      href: "/dashboard/admin/dashboard",
+    },
+    {
+      id: "formations",
+      label: "Formations",
+      icon: BookOpenIcon,
+      href: "/dashboard/formateur/formations",
+    },
+    {
+      id: "formateurs",
+      label: "Formateurs",
+      icon: UserCheckIcon,
+      href: "/dashboard/admin/formateurs",
+    },
+    {
+      id: "participants",
+      label: "Participants",
+      icon: GraduationCapIcon,
+      href: "/dashboard/admin/participants",
+    },
+  ];
+
   const menuItems =
-    user?.role === "formateur" ? menuItemsFormateur : menuItemsParticip;
+    user?.role === "formateur"
+      ? menuItemsFormateur
+      : user?.role === "participant"
+      ? menuItemsParticip
+      : menuItemsAdmin;
 
   return (
     <div

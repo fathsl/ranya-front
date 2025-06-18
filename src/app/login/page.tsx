@@ -13,6 +13,7 @@ import {
   MailIcon,
   UsersIcon,
 } from "lucide-react";
+import AccessDeniedDialog from "@/components/AccessDeniedDialog";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showAccessDenied, setShowAccessDenied] = useState(false);
   const router = useRouter();
   const { user, setUser } = useAuth();
 
@@ -40,8 +42,12 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok && data.user && data.user.id) {
-        localStorage.setItem("user", JSON.stringify(data.user));
+        if (data.user.role === "formateur" && data.user.isAccepted === false) {
+          setShowAccessDenied(true);
+          return;
+        }
 
+        localStorage.setItem("user", JSON.stringify(data.user));
         localStorage.setItem("token", data.user.token);
         setUser(data.user);
         console.log("user", user);
@@ -62,6 +68,13 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCloseAccessDenied = () => {
+    setShowAccessDenied(false);
+    // Clear form fields
+    setEmail("");
+    setPassword("");
   };
 
   return (
@@ -270,6 +283,10 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
+        <AccessDeniedDialog
+          isOpen={showAccessDenied}
+          onClose={handleCloseAccessDenied}
+        />
       </div>
 
       <style jsx>{`
