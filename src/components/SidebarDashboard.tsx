@@ -3,7 +3,6 @@ import {
   AwardIcon,
   BookOpenIcon,
   CalendarIcon,
-  FileQuestionIcon,
   FilesIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
@@ -36,6 +35,12 @@ const Sidebar = () => {
       href: "/dashboard/participant/calendrier",
     },
     {
+      id: "ressources",
+      label: "Ressources",
+      icon: FilesIcon,
+      href: "/dashboard/formateur/ressources",
+    },
+    {
       id: "participants",
       label: "Participants",
       icon: GraduationCapIcon,
@@ -62,23 +67,12 @@ const Sidebar = () => {
       icon: BookOpenIcon,
       href: "/dashboard/participant/mes-formations",
     },
-    {
-      id: "ressources",
-      label: "Ressources",
-      icon: FilesIcon,
-      href: "/dashboard/formateur/ressources",
-    },
+
     {
       id: "certificats",
       label: "My Certificats",
       icon: AwardIcon,
       href: "/dashboard/participant/certificates",
-    },
-    {
-      id: "quiz",
-      label: "Quiz",
-      icon: FileQuestionIcon,
-      href: "/dashboard/participant/quizzes",
     },
   ];
 

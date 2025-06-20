@@ -1,6 +1,16 @@
 "use client";
 
 import {
+  calculateCompletionRate,
+  calculateDashboardData,
+  Certificate,
+  DashboardData,
+  DOMAIN_COLORS,
+  fetchCertificates,
+  fetchFormations,
+  Formation,
+} from "@/help/help";
+import {
   ActivityIcon,
   AwardIcon,
   BookOpenIcon,
@@ -9,10 +19,9 @@ import {
   PlayIcon,
   StarIcon,
   TargetIcon,
-  TrendingUpIcon,
   UsersIcon,
 } from "lucide-react";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { FaIcons } from "react-icons/fa";
 import {
   LineChart,
@@ -28,6 +37,82 @@ import {
 } from "recharts";
 
 const Dashboard = () => {
+  const [formations, setFormations] = useState<Formation[]>([]);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(
+    null
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadFormations = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [formationsData, certificatesData] = await Promise.all([
+          fetchFormations(),
+          fetchCertificates(),
+        ]);
+
+        setFormations(formationsData);
+        setCertificates(certificatesData);
+
+        const calculatedDashboardData = calculateDashboardData(formationsData);
+        setDashboardData(calculatedDashboardData);
+      } catch (error: any) {
+        setError(error.message || "Unknown error");
+        console.error("Error loading data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFormations();
+  }, []);
+
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchFormations();
+      setFormations(data);
+      const calculatedDashboardData = calculateDashboardData(data);
+      setDashboardData(calculatedDashboardData);
+    } catch (error: any) {
+      setError(error.message || "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const preparePieChartData = () => {
+    if (!dashboardData) return [];
+
+    const domainData = dashboardData.domainData;
+    const total = Object.values(domainData).reduce(
+      (sum, count) => sum + count,
+      0
+    );
+
+    return Object.entries(domainData).map(([domain, count], index) => ({
+      name: domain,
+      value: total > 0 ? Math.round((count / total) * 100) : 0,
+      actualCount: count,
+      color: DOMAIN_COLORS[index % DOMAIN_COLORS.length],
+    }));
+  };
+
+  const pieChartData = preparePieChartData();
+  const totalParticipants = formations.reduce((total, formation) => {
+    return total + formation.participants.length;
+  }, 0);
+  const completionRate = calculateCompletionRate(
+    certificates.length,
+    totalParticipants
+  );
+
   const stats = {
     totalFormations: 156,
     totalFormateurs: 24,
@@ -43,14 +128,6 @@ const Dashboard = () => {
     { month: "Mar", participants: 1120, formations: 142, completions: 88 },
     { month: "Avr", participants: 1180, formations: 148, completions: 90 },
     { month: "Mai", participants: 1247, formations: 156, completions: 87 },
-  ];
-
-  const formationCategories = [
-    { name: "Développement Web", value: 35, color: "#3B82F6" },
-    { name: "Design UI/UX", value: 25, color: "#8B5CF6" },
-    { name: "Marketing Digital", value: 20, color: "#10B981" },
-    { name: "Gestion de Projet", value: 15, color: "#F59E0B" },
-    { name: "Autres", value: 5, color: "#EF4444" },
   ];
 
   const topFormateurs = [
@@ -83,27 +160,12 @@ const Dashboard = () => {
     },
   ];
 
-  const StatCard = ({
-    title = "",
-    icon,
-    value = 0,
-    change = 0,
-    color = "blue",
-  }) => (
+  const StatCard = ({ title = "", icon, value = 0, color = "blue" }) => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
           <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {change && (
-            <div className="flex items-center mt-2">
-              <TrendingUpIcon className="w-4 h-4 text-green-500 mr-1" />
-              <span className="text-sm text-green-600 font-medium">
-                +{change}%
-              </span>
-              <span className="text-sm text-gray-500 ml-1">ce mois</span>
-            </div>
-          )}
         </div>
         <div className={`p-3 rounded-lg bg-${color}-50`}>
           <FaIcons className={`w-6 h-6 text-${color}-600`} />
@@ -111,7 +173,32 @@ const Dashboard = () => {
       </div>
     </div>
   );
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-lg">Loading dashboard...</div>
+      </div>
+    );
+  }
 
+  if (error) {
+    return (
+      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <strong className="font-bold">Error: </strong>
+        <span className="block sm:inline">{error}</span>
+        <button
+          onClick={refreshData}
+          className="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return <div>No data available</div>;
+  }
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-8">
@@ -124,30 +211,26 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
         <StatCard
           title="Total Formations"
-          value={stats.totalFormations}
+          value={dashboardData.totalFormations}
           icon={BookOpenIcon}
-          change={8.2}
           color="blue"
         />
         <StatCard
-          title="Formateurs Actifs"
-          value={stats.totalFormateurs}
-          icon={UsersIcon}
-          change={5.1}
-          color="purple"
+          title="Formations ce Mois"
+          value={dashboardData.thisMonthFormations}
+          icon={BookOpenIcon}
+          color="green"
         />
         <StatCard
           title="Participants"
-          value={stats.totalParticipants}
+          value={totalParticipants}
           icon={GraduationCapIcon}
-          change={12.5}
           color="green"
         />
         <StatCard
           title="Taux de Réussite"
-          value={stats.completionRate}
+          value={completionRate}
           icon={TargetIcon}
-          change={3.2}
           color="orange"
         />
         <StatCard
@@ -160,7 +243,6 @@ const Dashboard = () => {
           title="Certifications"
           value={892}
           icon={AwardIcon}
-          change={15.3}
           color="indigo"
         />
       </div>
@@ -217,39 +299,67 @@ const Dashboard = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-6">
             Catégories de Formations
           </h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <RechartsPieChart>
-              <Pie
-                dataKey="value"
-                data={formationCategories}
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-              >
-                {formationCategories.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </RechartsPieChart>
-          </ResponsiveContainer>
-          <div className="mt-4 space-y-2">
-            {formationCategories.map((category, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: category.color }}
-                  ></div>
-                  <span className="text-sm text-gray-600">{category.name}</span>
-                </div>
-                <span className="text-sm font-medium text-gray-900">
-                  {category.value}%
-                </span>
+          {pieChartData.length > 0 ? (
+            <div className="flex flex-col lg:flex-row items-center">
+              <div className="w-full lg:w-1/2">
+                <ResponsiveContainer width="100%" height={300}>
+                  <RechartsPieChart>
+                    <Pie
+                      dataKey="value"
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value, name, props) => [
+                        `${props.payload.actualCount} formations (${value}%)`,
+                        "Nombre",
+                      ]}
+                    />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+
+              <div className="w-full lg:w-1/2 mt-4 lg:mt-0 lg:pl-6">
+                <div className="space-y-3">
+                  {pieChartData.map((category, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-center">
+                        <div
+                          className="w-4 h-4 rounded-full mr-3"
+                          style={{ backgroundColor: category.color }}
+                        ></div>
+                        <span className="text-sm font-medium text-gray-700">
+                          {category.name}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-gray-900">
+                          {category.actualCount}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          ({category.value}%)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Aucune donnée de domaine disponible
+            </div>
+          )}
         </div>
       </div>
 
