@@ -898,6 +898,7 @@ export default function CertificatesList() {
           isOpen={isModalOpen}
           onClose={handleCloseModal}
           certificates={certificates}
+          handleDownload={handleDownloadCertificate}
         />
       </div>
     </div>

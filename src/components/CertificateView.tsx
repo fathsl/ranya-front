@@ -13,6 +13,7 @@ const CertificateViewModal = ({
   isOpen,
   onClose,
   certificates,
+  handleDownload,
 }) => {
   const certificate = certificates.find(
     (cert: { id: undefined }) => cert.id === certificateId
@@ -29,11 +30,6 @@ const CertificateViewModal = ({
       day: "numeric",
     });
   };
-
-  const handleDownload = () => {
-    console.log("Download certificate:", certificateId);
-  };
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -232,7 +228,12 @@ const CertificateViewModal = ({
           </div>
           <div className="flex gap-3">
             <button
-              onClick={handleDownload}
+              onClick={() =>
+                handleDownload(
+                  certificate.id,
+                  certificate.formationEntity?.titre || certificate.formation
+                )
+              }
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               <DownloadIcon className="w-4 h-4" />

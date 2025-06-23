@@ -150,10 +150,12 @@ export default function HomePage() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <button className="px-8 py-4 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-full font-semibold text-lg hover:from-blue-600 hover:to-green-600 transition-all transform hover:scale-105 flex items-center justify-center">
-                  Commencer gratuitement
-                  <ArrowRightIcon className="ml-2 h-5 w-5" />
-                </button>
+                <Link href="/register">
+                  <button className="px-8 py-4 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-full font-semibold text-lg hover:from-blue-600 hover:to-green-600 transition-all transform hover:scale-105 flex items-center justify-center">
+                    Commencer gratuitement
+                    <ArrowRightIcon className="ml-2 h-5 w-5" />
+                  </button>
+                </Link>
                 <button className="px-8 py-4 bg-white border-2 border-gray-200 text-gray-700 rounded-full font-semibold text-lg hover:border-blue-500 hover:text-blue-600 transition-all flex items-center justify-center">
                   <PlayIcon className="mr-2 h-5 w-5" />
                   Voir la démo

@@ -122,7 +122,7 @@ interface EditResourceData {
 const ResourcesInterface = () => {
   const [formations, setFormations] = useState<FormationEntity[]>([]);
   const [modules, setModules] = useState<ModuleEntity[]>([]);
-  const [questions, setQuestions] = useState<EvaluationTest[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [resources, setResources] = useState<ResourceEntity[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -438,6 +438,7 @@ const ResourcesInterface = () => {
 
   const getFormationStats = (formationId: string) => {
     const formationModules = getFormationModules(formationId);
+
     let totalResources = 0;
     let completedResources = 0;
     let totalDuration = 0;
@@ -446,10 +447,7 @@ const ResourcesInterface = () => {
       const moduleResources = getModuleResources(module.id);
       totalResources += moduleResources.length;
       completedResources += moduleResources.filter((r) => r.isCompleted).length;
-      totalDuration += moduleResources.reduce(
-        (sum, r) => sum + (r.duration || 0),
-        0
-      );
+      totalDuration += Number(module.duration);
     });
 
     return { totalResources, completedResources, totalDuration };
@@ -866,6 +864,8 @@ const ResourcesInterface = () => {
                   const isExpanded = expandedFormations.has(formation.id);
                   const formationModules = getFormationModules(formation.id);
                   const stats = getFormationStats(formation.id);
+                  console.log("stats", stats.totalDuration);
+
                   const progressPercentage =
                     stats.totalResources > 0
                       ? Math.round(
@@ -927,7 +927,7 @@ const ResourcesInterface = () => {
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-2 text-gray-600">
                             <ClockIcon size={16} />
-                            {formatDuration(stats.totalDuration)}
+                            {stats.totalDuration}min
                           </div>
                         </td>
                         <td className="py-4 px-6">
