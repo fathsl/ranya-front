@@ -21,17 +21,16 @@ import { useState } from "react";
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   return (
     <div className="min-h-screen bg-white">
       <nav className="bg-white/90 backdrop-blur-md fixed w-full z-50 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-2">
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 p-2 rounded-xl">
+              <div className="bg-gradient-to-r from-blue-500 to-green-500 p-2 rounded-xl">
                 <GraduationCapIcon className="h-6 w-6 text-white" />
               </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
                 FormaBoost
               </span>
             </div>
@@ -39,30 +38,30 @@ export default function HomePage() {
             <div className="hidden md:flex items-center space-x-8">
               <a
                 href="#courses"
-                className="text-gray-700 hover:text-orange-600 font-medium transition-colors"
+                className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
               >
                 Formations
               </a>
               <a
                 href="#about"
-                className="text-gray-700 hover:text-orange-600 font-medium transition-colors"
+                className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
               >
                 À propos
               </a>
               <a
                 href="#contact"
-                className="text-gray-700 hover:text-orange-600 font-medium transition-colors"
+                className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
               >
                 Contact
               </a>
               <div className="flex items-center space-x-3">
                 <Link href="/login">
-                  <button className="px-4 py-2 text-orange-600 hover:text-orange-700 font-medium transition-colors">
+                  <button className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium transition-colors">
                     Se connecter
                   </button>
                 </Link>
                 <Link href="/register">
-                  <button className="px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full hover:from-orange-600 hover:to-red-600 font-medium transition-all transform hover:scale-105">
+                  <button className="px-6 py-2 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-full hover:from-blue-600 hover:to-green-600 font-medium transition-all transform hover:scale-105">
                     S&apos;inscrire
                   </button>
                 </Link>
@@ -87,53 +86,57 @@ export default function HomePage() {
             <div className="px-4 py-4 space-y-4">
               <a
                 href="#courses"
-                className="block text-gray-700 hover:text-orange-600 font-medium"
+                className="block text-gray-700 hover:text-blue-600 font-medium"
               >
                 Formations
               </a>
               <a
                 href="#about"
-                className="block text-gray-700 hover:text-orange-600 font-medium"
+                className="block text-gray-700 hover:text-blue-600 font-medium"
               >
                 À propos
               </a>
               <a
                 href="#contact"
-                className="block text-gray-700 hover:text-orange-600 font-medium"
+                className="block text-gray-700 hover:text-blue-600 font-medium"
               >
                 Contact
               </a>
               <div className="flex flex-col space-y-2 pt-4 border-t border-gray-100">
-                <button className="px-4 py-2 text-orange-600 font-medium text-left">
-                  Se connecter
-                </button>
-                <button className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full font-medium">
-                  S&apos;inscrire
-                </button>
+                <Link href="/login">
+                  <button className="px-4 py-2 text-blue-600 font-medium text-left">
+                    Se connecter
+                  </button>
+                </Link>
+                <Link href="/register">
+                  <button className="px-4 py-2 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-full font-medium">
+                    S&apos;inscrire
+                  </button>
+                </Link>
               </div>
             </div>
           </div>
         )}
       </nav>
 
-      <section className="pt-20 pb-16 bg-gradient-to-br from-orange-50 via-white to-red-50 relative overflow-hidden">
+      <section className="pt-20 pb-16 bg-gradient-to-br from-blue-50 via-white to-green-50 relative overflow-hidden">
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-72 h-72 bg-orange-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-          <div className="absolute top-0 right-0 w-72 h-72 bg-red-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-          <div className="absolute bottom-0 left-1/2 w-72 h-72 bg-yellow-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+          <div className="absolute top-0 left-0 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+          <div className="absolute top-0 right-0 w-72 h-72 bg-green-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+          <div className="absolute bottom-0 left-1/2 w-72 h-72 bg-teal-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="text-center lg:text-left">
-              <div className="inline-flex items-center bg-orange-100 text-orange-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
+              <div className="inline-flex items-center bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
                 <ZapIcon className="h-4 w-4 mr-2" />
                 Nouveau : IA intégrée pour un apprentissage personnalisé
               </div>
 
               <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
                 Transformez votre
-                <span className="bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-blue-500 to-green-500 bg-clip-text text-transparent">
                   {" "}
                   carrière{" "}
                 </span>
@@ -147,11 +150,11 @@ export default function HomePage() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <button className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full font-semibold text-lg hover:from-orange-600 hover:to-red-600 transition-all transform hover:scale-105 flex items-center justify-center">
+                <button className="px-8 py-4 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-full font-semibold text-lg hover:from-blue-600 hover:to-green-600 transition-all transform hover:scale-105 flex items-center justify-center">
                   Commencer gratuitement
                   <ArrowRightIcon className="ml-2 h-5 w-5" />
                 </button>
-                <button className="px-8 py-4 bg-white border-2 border-gray-200 text-gray-700 rounded-full font-semibold text-lg hover:border-orange-500 hover:text-orange-600 transition-all flex items-center justify-center">
+                <button className="px-8 py-4 bg-white border-2 border-gray-200 text-gray-700 rounded-full font-semibold text-lg hover:border-blue-500 hover:text-blue-600 transition-all flex items-center justify-center">
                   <PlayIcon className="mr-2 h-5 w-5" />
                   Voir la démo
                 </button>
@@ -175,7 +178,7 @@ export default function HomePage() {
 
             <div className="relative">
               <div className="bg-white rounded-3xl shadow-2xl p-8 transform rotate-3 hover:rotate-0 transition-transform duration-500">
-                <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl p-6 text-white mb-6">
+                <div className="bg-gradient-to-br from-blue-500 to-green-500 rounded-2xl p-6 text-white mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold">Votre progression</h3>
                     <TrendingUpIcon className="h-6 w-6" />
@@ -202,14 +205,14 @@ export default function HomePage() {
                       Terminé
                     </span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mr-3">
-                        <PlayIcon className="h-5 w-5 text-orange-600" />
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                        <PlayIcon className="h-5 w-5 text-blue-600" />
                       </div>
                       <span className="font-medium">Node.js & API</span>
                     </div>
-                    <span className="text-orange-600 font-semibold">
+                    <span className="text-blue-600 font-semibold">
                       En cours
                     </span>
                   </div>
@@ -224,25 +227,19 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="text-center">
-              <div className="text-4xl font-bold text-orange-600 mb-2">
-                50K+
-              </div>
+              <div className="text-4xl font-bold text-blue-600 mb-2">50K+</div>
               <div className="text-gray-600">Étudiants actifs</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-orange-600 mb-2">
-                500+
-              </div>
+              <div className="text-4xl font-bold text-blue-600 mb-2">500+</div>
               <div className="text-gray-600">Formations disponibles</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-orange-600 mb-2">95%</div>
+              <div className="text-4xl font-bold text-blue-600 mb-2">95%</div>
               <div className="text-gray-600">Taux de satisfaction</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-orange-600 mb-2">
-                200+
-              </div>
+              <div className="text-4xl font-bold text-blue-600 mb-2">200+</div>
               <div className="text-gray-600">Formateurs experts</div>
             </div>
           </div>
@@ -298,7 +295,7 @@ export default function HomePage() {
             </div>
 
             <div className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow group">
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 w-16 h-16 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <div className="bg-gradient-to-br from-teal-500 to-teal-600 w-16 h-16 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <AwardIcon className="h-8 w-8 text-white" />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
@@ -308,7 +305,7 @@ export default function HomePage() {
                 Obtenez des certifications valorisées par les employeurs et
                 reconnues dans l&apos;industrie pour booster votre carrière.
               </p>
-              <div className="flex items-center text-purple-600 font-semibold">
+              <div className="flex items-center text-teal-600 font-semibold">
                 Voir les certifications
                 <ChevronRightIcon className="ml-2 h-4 w-4" />
               </div>
@@ -363,12 +360,12 @@ export default function HomePage() {
             ].map((course, index) => (
               <div
                 key={index}
-                className="bg-white border-2 border-gray-100 rounded-2xl overflow-hidden hover:border-orange-500 hover:shadow-xl transition-all group"
+                className="bg-white border-2 border-gray-100 rounded-2xl overflow-hidden hover:border-blue-500 hover:shadow-xl transition-all group"
               >
                 <div className="p-8">
                   <div className="text-4xl mb-4">{course.image}</div>
                   <div className="flex items-center justify-between mb-4">
-                    <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                    <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                       {course.level}
                     </span>
                     <div className="flex items-center">
@@ -386,7 +383,7 @@ export default function HomePage() {
                     <span>{course.students} étudiants</span>
                     <span>{course.duration}</span>
                   </div>
-                  <button className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-xl font-semibold hover:from-orange-600 hover:to-red-600 transition-all group-hover:scale-105">
+                  <button className="w-full bg-gradient-to-r from-blue-500 to-green-500 text-white py-3 rounded-xl font-semibold hover:from-blue-600 hover:to-green-600 transition-all group-hover:scale-105">
                     Découvrir la formation
                   </button>
                 </div>
@@ -396,20 +393,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="py-20 bg-gradient-to-r from-orange-500 to-red-500">
+      <section className="py-20 bg-gradient-to-r from-blue-500 to-green-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl font-bold text-white mb-6">
             Prêt à transformer votre carrière ?
           </h2>
-          <p className="text-xl text-orange-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
             Rejoignez des milliers de professionnels qui ont déjà fait le choix
             de l&apos;excellence avec FormaBoost
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-4 bg-white text-orange-600 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all transform hover:scale-105">
+            <button className="px-8 py-4 bg-white text-blue-600 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all transform hover:scale-105">
               Commencer gratuitement
             </button>
-            <button className="px-8 py-4 border-2 border-white text-white rounded-full font-semibold text-lg hover:bg-white hover:text-orange-600 transition-all">
+            <button className="px-8 py-4 border-2 border-white text-white rounded-full font-semibold text-lg hover:bg-white hover:text-blue-600 transition-all">
               Parler à un conseiller
             </button>
           </div>
@@ -421,7 +418,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center space-x-2 mb-6">
-                <div className="bg-gradient-to-r from-orange-500 to-red-500 p-2 rounded-xl">
+                <div className="bg-gradient-to-r from-blue-500 to-green-500 p-2 rounded-xl">
                   <GraduationCapIcon className="h-6 w-6 text-white" />
                 </div>
                 <span className="text-2xl font-bold text-white">
@@ -433,10 +430,10 @@ export default function HomePage() {
                 professionnel.
               </p>
               <div className="flex space-x-4">
-                <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-orange-500 transition-colors cursor-pointer">
+                <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-blue-500 transition-colors cursor-pointer">
                   <GlobeIcon className="h-5 w-5" />
                 </div>
-                <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-orange-500 transition-colors cursor-pointer">
+                <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-blue-500 transition-colors cursor-pointer">
                   <UsersIcon className="h-5 w-5" />
                 </div>
               </div>
@@ -446,34 +443,22 @@ export default function HomePage() {
               <h3 className="text-white font-semibold mb-4">Formations</h3>
               <ul className="space-y-2">
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Développement Web
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Cybersécurité
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Data Science
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Leadership
                   </a>
                 </li>
@@ -484,34 +469,22 @@ export default function HomePage() {
               <h3 className="text-white font-semibold mb-4">Support</h3>
               <ul className="space-y-2">
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Centre d&apos;aide
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Contact
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     FAQ
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Communauté
                   </a>
                 </li>
@@ -522,34 +495,22 @@ export default function HomePage() {
               <h3 className="text-white font-semibold mb-4">Entreprise</h3>
               <ul className="space-y-2">
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     À propos
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Carrières
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Presse
                   </a>
                 </li>
                 <li>
-                  <a
-                    href="#"
-                    className="hover:text-orange-400 transition-colors"
-                  >
+                  <a href="#" className="hover:text-blue-400 transition-colors">
                     Partenaires
                   </a>
                 </li>
@@ -564,19 +525,19 @@ export default function HomePage() {
             <div className="flex space-x-6 mt-4 md:mt-0">
               <a
                 href="#"
-                className="text-gray-400 hover:text-orange-400 transition-colors"
+                className="text-gray-400 hover:text-blue-400 transition-colors"
               >
                 Confidentialité
               </a>
               <a
                 href="#"
-                className="text-gray-400 hover:text-orange-400 transition-colors"
+                className="text-gray-400 hover:text-blue-400 transition-colors"
               >
                 Conditions
               </a>
               <a
                 href="#"
-                className="text-gray-400 hover:text-orange-400 transition-colors"
+                className="text-gray-400 hover:text-blue-400 transition-colors"
               >
                 Cookies
               </a>

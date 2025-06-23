@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/authContext";
+import AccessDeniedDialog from "@/components/AccessDeniedDialog";
 import {
   AwardIcon,
   BookOpenIcon,
@@ -13,7 +14,6 @@ import {
   MailIcon,
   UsersIcon,
 } from "lucide-react";
-import AccessDeniedDialog from "@/components/AccessDeniedDialog";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -78,15 +78,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen w-full bg-gradient-to-br from-green-50 via-blue-50 to-teal-50 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-10 -left-10 w-72 h-72 bg-gradient-to-r from-blue-200 to-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-        <div className="absolute -top-10 -right-10 w-72 h-72 bg-gradient-to-r from-yellow-200 to-pink-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-gradient-to-r from-pink-200 to-orange-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+        <div className="absolute -top-10 -left-10 size-72 bg-gradient-to-r from-green-200 to-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+        <div className="absolute -top-10 -right-10 size-72 bg-gradient-to-r from-blue-200 to-teal-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+        <div className="absolute -bottom-8 left-20 size-72 bg-gradient-to-r from-teal-200 to-green-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
       </div>
 
       <div className="flex max-w-6xl w-full relative z-10">
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-purple-700 rounded-l-3xl p-12 text-white flex-col justify-center relative overflow-hidden">
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-green-600 to-blue-600 rounded-l-3xl p-12 text-white flex-col justify-center relative overflow-hidden">
           <div className="absolute inset-0 bg-black bg-opacity-10"></div>
           <div className="relative z-10">
             <div className="flex items-center mb-8">
@@ -98,11 +98,11 @@ export default function LoginPage() {
 
             <h2 className="text-4xl font-bold mb-6 leading-tight">
               Transformez votre
-              <span className="text-yellow-300"> avenir </span>
+              <span className="text-green-300"> avenir </span>
               avec l&apos;apprentissage
             </h2>
 
-            <p className="text-lg mb-8 text-blue-100">
+            <p className="text-lg mb-8 text-green-100">
               Rejoignez plus de 50,000 étudiants qui développent leurs
               compétences avec nos cours expertement conçus.
             </p>
@@ -114,7 +114,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold">1000+ Cours</h3>
-                  <p className="text-sm text-blue-100">
+                  <p className="text-sm text-green-100">
                     Dans tous les domaines
                   </p>
                 </div>
@@ -126,7 +126,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold">Experts Certifiés</h3>
-                  <p className="text-sm text-blue-100">
+                  <p className="text-sm text-green-100">
                     Instructeurs de qualité
                   </p>
                 </div>
@@ -138,27 +138,29 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold">Certificats Reconnus</h3>
-                  <p className="text-sm text-blue-100">Valorisez votre CV</p>
+                  <p className="text-sm text-green-100">Valorisez votre CV</p>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="absolute top-10 right-10 w-16 h-16 bg-white bg-opacity-10 rounded-full animate-bounce"></div>
-          <div className="absolute bottom-20 right-20 w-8 h-8 bg-yellow-300 bg-opacity-30 rounded-full animate-pulse"></div>
+          <div className="absolute bottom-20 right-20 w-8 h-8 bg-green-300 bg-opacity-30 rounded-full animate-pulse"></div>
         </div>
 
         <div className="w-full lg:w-1/2 bg-white lg:rounded-r-3xl shadow-2xl p-8 lg:p-12">
           <div className="max-w-md mx-auto">
             <div className="lg:hidden flex items-center justify-center mb-8">
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 rounded-2xl mr-3">
+              <div className="bg-gradient-to-r from-green-600 to-blue-600 p-3 rounded-2xl mr-3">
                 <GraduationCapIcon size={24} className="text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-800">EduLearn Pro</h1>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                EduLearn Pro
+              </h1>
             </div>
 
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-800 mb-2">
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-2">
                 Bon retour !
               </h2>
               <p className="text-gray-600">
@@ -180,13 +182,13 @@ export default function LoginPage() {
                 </label>
                 <div className="relative">
                   <MailIcon
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors"
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-green-600 transition-colors"
                     size={20}
                   />
                   <input
                     type="email"
                     placeholder="votre@email.com"
-                    className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
+                    className="w-full pl-12 pr-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -200,13 +202,13 @@ export default function LoginPage() {
                 </label>
                 <div className="relative">
                   <LockIcon
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors"
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-green-600 transition-colors"
                     size={20}
                   />
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="Votre mot de passe"
-                    className="w-full pl-12 pr-12 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
+                    className="w-full pl-12 pr-12 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -229,28 +231,22 @@ export default function LoginPage() {
                 <label className="flex items-center">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                   />
                   <span className="ml-2 text-sm text-gray-600">
                     Se souvenir de moi
                   </span>
                 </label>
-                {/* <a
-                  href="#"
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Mot de passe oublié ?
-                </a> */}
               </div>
 
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={loading}
-                className={`w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                className={`w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
                   loading
                     ? "opacity-70 cursor-not-allowed scale-100"
-                    : "hover:from-blue-700 hover:to-purple-700"
+                    : "hover:from-green-700 hover:to-blue-700"
                 }`}
               >
                 {loading ? (
@@ -269,7 +265,7 @@ export default function LoginPage() {
                 Pas encore de compte ?{" "}
                 <a
                   href="/register"
-                  className="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors"
+                  className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent font-semibold hover:underline transition-colors"
                 >
                   Créer un compte
                 </a>

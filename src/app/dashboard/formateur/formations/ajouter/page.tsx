@@ -73,6 +73,7 @@ interface Question {
 }
 
 interface EvaluationTest {
+  id?: string;
   isEnabled: boolean;
   title: string;
   timeLimit: number;
@@ -790,13 +791,71 @@ const FormationCreator = ({
     }));
   };
 
+  const createOrUpdateEvaluationTest = async (targetFormationId: string) => {
+    try {
+      const evaluationTestData = {
+        isEnabled: formData.evaluationTest?.isEnabled || false,
+        title: formData.evaluationTest?.title || "",
+        timeLimit: formData.evaluationTest?.timeLimit || 60,
+        passingScore: formData.evaluationTest?.passingScore || 70,
+        description: formData.evaluationTest?.description || "",
+        formationId: targetFormationId,
+      };
+
+      const existingTestId = formData.evaluationTest?.id;
+
+      if (existingTestId) {
+        const response = await fetch(
+          `${API_BASE_URL}/evaluation-tests/${existingTestId}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(evaluationTestData),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.message ||
+              `Failed to update evaluation test: ${response.statusText}`
+          );
+        }
+
+        return await response.json();
+      } else {
+        const response = await fetch(`${API_BASE_URL}/evaluation-tests`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(evaluationTestData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.message ||
+              `Failed to create evaluation test: ${response.statusText}`
+          );
+        }
+
+        return await response.json();
+      }
+    } catch (error) {
+      console.error("Error with evaluation test:", error);
+      throw error;
+    }
+  };
+
   const createQuestion = async () => {
     if (!currentQuestion.question?.trim()) {
       setError("Question text is required");
       return;
     }
 
-    // Validate based on question type
     if (currentQuestion.type === "multiple-choice") {
       const validOptions =
         currentQuestion.options?.filter((opt) => opt.trim()) || [];
@@ -828,7 +887,39 @@ const FormationCreator = ({
       setLoading(true);
       setError(null);
 
-      // Prepare the question data
+      const targetFormationId =
+        mode === "edit" ? formationIdEdit || currentFormationId : formationId;
+
+      if (!targetFormationId) {
+        throw new Error("Formation ID is required to create questions");
+      }
+
+      const promises = [];
+
+      let evaluationTestPromise;
+      if (
+        !formData.evaluationTest?.id ||
+        (formData.evaluationTest?.questions || []).length === 0
+      ) {
+        evaluationTestPromise = createOrUpdateEvaluationTest(targetFormationId);
+        promises.push(evaluationTestPromise);
+      }
+
+      let evaluationTest: EvaluationTest | undefined;
+      if (evaluationTestPromise) {
+        evaluationTest = await evaluationTestPromise;
+
+        setFormData((prev) => ({
+          ...prev,
+          evaluationTest: {
+            ...prev.evaluationTest!,
+            id: evaluationTest?.id,
+          },
+        }));
+      } else {
+        evaluationTest = formData.evaluationTest;
+      }
+
       const questionData = {
         type: currentQuestion.type!,
         question: currentQuestion.question!,
@@ -839,11 +930,12 @@ const FormationCreator = ({
         correctAnswer: currentQuestion.correctAnswer!,
         points: currentQuestion.points || 1,
         explanation: currentQuestion.explanation || undefined,
-        formationId: formationId,
+        evaluationTestId: evaluationTest?.id,
         order: (formData.evaluationTest?.questions.length || 0) + 1,
+        formationId: targetFormationId,
       };
 
-      const response = await fetch(`${API_BASE_URL}/questions`, {
+      const questionResponse = await fetch(`${API_BASE_URL}/questions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -851,21 +943,22 @@ const FormationCreator = ({
         body: JSON.stringify(questionData),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      if (!questionResponse.ok) {
+        const errorData = await questionResponse.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            `Failed to create question: ${response.statusText}`
+            `Failed to create question: ${questionResponse.statusText}`
         );
       }
 
-      const createdQuestion = await response.json();
+      const createdQuestion = await questionResponse.json();
 
-      // Add the new question to the local state
+      // Update local state with the new question
       setFormData((prev) => ({
         ...prev,
         evaluationTest: {
           ...prev.evaluationTest!,
+          id: evaluationTest?.id || prev.evaluationTest?.id,
           questions: [
             ...(prev.evaluationTest?.questions || []),
             createdQuestion,
@@ -873,7 +966,7 @@ const FormationCreator = ({
         },
       }));
 
-      // Reset the form
+      // Reset current question form
       setCurrentQuestion({
         type: "multiple-choice",
         question: "",
@@ -900,29 +993,50 @@ const FormationCreator = ({
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
+      const targetFormationId =
+        mode === "edit" ? formationIdEdit || currentFormationId : formationId;
+
+      if (!targetFormationId) {
+        throw new Error("Formation ID is required");
+      }
+
+      // Prepare promises for parallel execution
+      const promises = [];
+
+      // 1. Update evaluation test settings if needed
+      const evaluationTestPromise =
+        createOrUpdateEvaluationTest(targetFormationId);
+      promises.push(evaluationTestPromise);
+
+      // 2. Update question
+      const questionPromise = fetch(`${API_BASE_URL}/questions/${questionId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(questionData),
       });
+      promises.push(questionPromise);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      // Execute both operations in parallel
+      const [evaluationTest, questionResponse] = await Promise.all(promises);
+
+      if (!questionResponse.ok) {
+        const errorData = await questionResponse.json().catch(() => ({}));
         throw new Error(
           errorData.message ||
-            `Failed to update question: ${response.statusText}`
+            `Failed to update question: ${questionResponse.statusText}`
         );
       }
 
-      const updatedQuestion = await response.json();
+      const updatedQuestion = await questionResponse.json();
 
       // Update the question in local state
       setFormData((prev) => ({
         ...prev,
         evaluationTest: {
           ...prev.evaluationTest!,
+          id: evaluationTest.id,
           questions: (prev.evaluationTest?.questions || []).map((q) =>
             q.id === questionId ? updatedQuestion : q
           ),
@@ -1180,6 +1294,166 @@ const FormationCreator = ({
     );
   };
 
+  const addQuiz = (moduleIndex: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      modules: prev.modules.map((module, i) =>
+        i === moduleIndex
+          ? {
+              ...module,
+              questions: [
+                ...(module.questions || []),
+                {
+                  question: "",
+                  options: ["", "", "", ""],
+                  correctAnswer: 0,
+                },
+              ],
+            }
+          : module
+      ),
+    }));
+  };
+
+  const removeQuiz = (moduleIndex: number, questionIndex: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      modules: prev.modules.map((module, i) =>
+        i === moduleIndex
+          ? {
+              ...module,
+              questions:
+                module.questions?.filter((_, qi) => qi !== questionIndex) || [],
+            }
+          : module
+      ),
+    }));
+  };
+
+  const updateQuiz = (
+    moduleIndex: number,
+    questionIndex: number,
+    field: string,
+    value: string | number
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      modules: prev.modules.map((module, i) =>
+        i === moduleIndex
+          ? {
+              ...module,
+              questions:
+                module.questions?.map((question, qi) =>
+                  qi === questionIndex
+                    ? { ...question, [field]: value }
+                    : question
+                ) || [],
+            }
+          : module
+      ),
+    }));
+  };
+
+  const updateQuestionOption = (
+    moduleIndex: number,
+    questionIndex: number,
+    optionIndex: number,
+    value: string
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      modules: prev.modules.map((module, i) =>
+        i === moduleIndex
+          ? {
+              ...module,
+              questions:
+                module.questions?.map((question, qi) =>
+                  qi === questionIndex
+                    ? {
+                        ...question,
+                        options: question.options.map((option, oi) =>
+                          oi === optionIndex ? value : option
+                        ),
+                      }
+                    : question
+                ) || [],
+            }
+          : module
+      ),
+    }));
+  };
+
+  const saveQuizQuestions = async (
+    moduleId: string,
+    questions:
+      | { question: string; options: string[]; correctAnswer: number }[]
+      | undefined
+  ) => {
+    try {
+      // Use the correct formation ID based on mode
+      const formationIdToUse =
+        mode === "edit" ? currentFormationId : formationId;
+
+      if (!formationIdToUse) {
+        throw new Error("Formation ID is required");
+      }
+
+      if (!questions || questions.length === 0) {
+        throw new Error("No questions to save");
+      }
+
+      const validQuestions = questions.filter(
+        (q) =>
+          q.question &&
+          q.question.trim() &&
+          q.options &&
+          q.options.length === 4 &&
+          q.options.every((opt: string) => opt.trim()) &&
+          typeof q.correctAnswer === "number"
+      );
+
+      if (validQuestions.length === 0) {
+        throw new Error(
+          "No valid questions found. Please ensure all questions have text, 4 options, and a correct answer selected."
+        );
+      }
+
+      const response = await fetch("/api/quiz/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          formationId: formationIdToUse, // Use the correct formation ID
+          moduleId: moduleId,
+          questions: validQuestions,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save quiz questions");
+      }
+
+      const result = await response.json();
+      return result.data;
+    } catch (error) {
+      throw error instanceof Error
+        ? error
+        : new Error("An unexpected error occurred while saving quiz questions");
+    }
+  };
+  if (loading && mode === "edit") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading formation data...</p>
+        </div>
+      </div>
+    );
+  }
+
   const canProceed = (step: number) => {
     switch (step) {
       case 1:
@@ -1201,12 +1475,7 @@ const FormationCreator = ({
           )
         );
       case 3:
-        return (
-          !formData.evaluationTest?.isEnabled ||
-          (formData.evaluationTest?.isEnabled &&
-            formData.evaluationTest.title.trim() &&
-            (formData.evaluationTest.questions?.length || 0) > 0)
-        );
+        return true;
       case 4:
         return true;
       default:
@@ -2110,7 +2379,7 @@ const FormationCreator = ({
                         </div>
 
                         {/* Questions Section */}
-                        {/* <div className="mt-4 p-4 bg-white rounded-lg border border-gray-100">
+                        <div className="mt-4 p-4 bg-white rounded-lg border border-gray-100">
                           <div className="flex items-center justify-between mb-4">
                             <h5 className="text-md font-medium text-gray-800 flex items-center gap-2">
                               <HelpCircleIcon
@@ -2121,7 +2390,7 @@ const FormationCreator = ({
                             </h5>
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => addQuestion(index)}
+                                onClick={() => addQuiz(index)}
                                 className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-all text-sm font-medium flex items-center gap-2"
                               >
                                 <PlusIcon size={16} />
@@ -2187,7 +2456,7 @@ const FormationCreator = ({
                                       </span>
                                       <button
                                         onClick={() =>
-                                          removeQuestion(index, questionIndex)
+                                          removeQuiz(index, questionIndex)
                                         }
                                         className="text-red-500 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-all"
                                       >
@@ -2198,7 +2467,7 @@ const FormationCreator = ({
                                       type="text"
                                       value={question.question || ""}
                                       onChange={(e) =>
-                                        updateQuestion(
+                                        updateQuiz(
                                           index,
                                           questionIndex,
                                           "question",
@@ -2244,7 +2513,7 @@ const FormationCreator = ({
                                                 optionIndex
                                               }
                                               onChange={() =>
-                                                updateQuestion(
+                                                updateQuiz(
                                                   index,
                                                   questionIndex,
                                                   "correctAnswer",
@@ -2270,7 +2539,7 @@ const FormationCreator = ({
                               <p className="text-sm">No questions added yet</p>
                             </div>
                           )}
-                        </div> */}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2713,6 +2982,26 @@ const FormationCreator = ({
                 </div>
               </div>
             )}
+            <div className="flex justify-between mt-8">
+              <button
+                onClick={() => setCurrentStep(2)}
+                className={`${buttonClass} bg-gray-500 hover:bg-gray-600 text-white`}
+              >
+                <ArrowLeftIcon size={18} />
+                Previous
+              </button>
+              <button
+                onClick={() => setCurrentStep(4)}
+                className={`${buttonClass} ${
+                  canProceed(3)
+                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                Continue
+                <ArrowRight size={18} />
+              </button>
+            </div>
           </div>
         )}
         {currentStep === 4 && (

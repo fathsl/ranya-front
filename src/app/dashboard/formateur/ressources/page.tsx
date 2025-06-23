@@ -1,21 +1,22 @@
 "use client";
 
 import {
-  BookOpenIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ClipboardCheckIcon,
   ClockIcon,
   Edit3Icon,
-  FileTextIcon,
+  EditIcon,
   FolderIcon,
   GraduationCapIcon,
+  HelpCircleIcon,
   LayersIcon,
-  LinkIcon,
+  ListIcon,
+  PlayIcon,
   PlusIcon,
   SearchIcon,
   Trash2Icon,
-  VideoIcon,
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -52,6 +53,26 @@ interface ModuleEntity {
   updatedAt: string;
 }
 
+interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+}
+
+interface Quiz {
+  id: string;
+  title: string;
+  description: string;
+  moduleId: string;
+  formationId: string;
+  isActive: boolean;
+  questions: QuizQuestion[];
+  module: ModuleEntity;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 interface FormationEntity {
   id: string;
   titre: string;
@@ -59,6 +80,29 @@ interface FormationEntity {
   modules: ModuleEntity[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Question {
+  id: string;
+  type: "multiple-choice" | "true-false" | "short-answer";
+  question: string;
+  options?: string[];
+  correctAnswer: string;
+  points: number;
+  explanation?: string;
+  order: number;
+  formationId: string;
+}
+
+export interface EvaluationTest {
+  isEnabled: boolean;
+  title: string;
+  timeLimit: number;
+  passingScore: number;
+  description: string;
+  questions: Question[];
+  formationId: string;
+  formation: FormationEntity;
 }
 
 interface EditResourceData {
@@ -78,12 +122,22 @@ interface EditResourceData {
 const ResourcesInterface = () => {
   const [formations, setFormations] = useState<FormationEntity[]>([]);
   const [modules, setModules] = useState<ModuleEntity[]>([]);
+  const [questions, setQuestions] = useState<EvaluationTest[]>([]);
   const [resources, setResources] = useState<ResourceEntity[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditMenuOpen, setIsEditMenuOpen] = useState(false);
   const [expandedFormations, setExpandedFormations] = useState(new Set());
   const [selectedResource, setSelectedResource] =
     useState<ResourceEntity | null>(null);
+  const [quizzesByModule, setQuizzesByModule] = useState<
+    Record<string, Quiz[]>
+  >({});
+  const [, setLoadingQuizzes] = useState<Record<string, boolean>>({});
+  const [evaluationTests, setEvaluationTests] = useState<EvaluationTest[]>([]);
+  const [editTestDrawerOpen, setEditTestDrawerOpen] = useState(false);
+  const [addQuestionDrawerOpen, setAddQuestionDrawerOpen] = useState(false);
+
   const [editData, setEditData] = useState<EditResourceData>({
     title: "",
     type: "video",
@@ -99,15 +153,39 @@ const ResourcesInterface = () => {
   });
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [loading] = useState(true);
+  const [questionsDrawerOpen, setQuestionsDrawerOpen] = useState(false);
+  const [selectedFormationQuestions, setSelectedFormationQuestions] = useState<
+    Question[]
+  >([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
     null
   );
+  const [isQuizDrawerOpen, setIsQuizDrawerOpen] = useState(false);
+  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
+  const [isEditingQuiz, setIsEditingQuiz] = useState(false);
+  const [isPlayingQuiz, setIsPlayingQuiz] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<number[]>([]);
+  const [selectedTest, setSelectedTest] = useState<EvaluationTest | null>(null);
+  const [selectedFormationId, setSelectedFormationId] = useState<string>("");
+  const [testDrawerOpen, setTestDrawerOpen] = useState(false);
+  const [quizResults, setQuizResults] = useState<{
+    score: number;
+    total: number;
+  } | null>(null);
+  const [editingQuizData, setEditingQuizData] = useState<Quiz | null>(null);
 
   useEffect(() => {
-    fetchFormations();
-    fetchModules();
-    fetchResources();
-  }, []);
+    const quizByModule: Record<string, Quiz[]> = {};
+    quizzes.forEach((quiz) => {
+      if (!quizByModule[quiz.moduleId]) {
+        quizByModule[quiz.moduleId] = [];
+      }
+      quizByModule[quiz.moduleId].push(quiz);
+    });
+    setQuizzesByModule(quizByModule);
+  }, [quizzes]);
 
   const fetchFormations = async () => {
     try {
@@ -143,6 +221,23 @@ const ResourcesInterface = () => {
     }
   };
 
+  const fetchQuestions = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:3001/questions", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setQuestions(data);
+      }
+    } catch (error) {
+      console.error("Error fetching modules:", error);
+    }
+  };
+
   const fetchResources = async () => {
     try {
       const response = await fetch("http://127.0.0.1:3001/resources", {
@@ -160,7 +255,84 @@ const ResourcesInterface = () => {
     }
   };
 
-  // Helper function to get module by ID
+  const fetchQuizzes = async (moduleId: string) => {
+    try {
+      setLoadingQuizzes((prev) => ({ ...prev, [moduleId]: true }));
+
+      const response = await fetch(
+        `http://127.0.0.1:3001/quizzes/module/${moduleId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        const activeQuizzes = result.data.filter((quiz: Quiz) => quiz.isActive);
+        setQuizzesByModule((prev) => ({
+          ...prev,
+          [moduleId]: activeQuizzes,
+        }));
+      } else {
+        throw new Error(result.message || "Failed to fetch quizzes");
+      }
+    } catch (error: any) {
+      console.error(`Error fetching quizzes for module ${moduleId}:`, error);
+      setQuizzesByModule((prev) => ({
+        ...prev,
+        [moduleId]: [],
+      }));
+    } finally {
+      setLoadingQuizzes((prev) => ({ ...prev, [moduleId]: false }));
+    }
+  };
+
+  const fetchAllQuizzes = async () => {
+    const moduleIds = modules.map((module) => module.id);
+    await Promise.all(moduleIds.map((moduleId) => fetchQuizzes(moduleId)));
+  };
+
+  useEffect(() => {
+    const initializeData = async () => {
+      await fetchFormations();
+      await fetchModules();
+      await fetchResources();
+      await fetchQuestions();
+    };
+
+    initializeData();
+  }, []);
+
+  useEffect(() => {
+    if (modules.length > 0) {
+      fetchAllQuizzes();
+    }
+  }, [modules]);
+
+  const getFormationModules = (formationId: string) => {
+    return modules.filter((module) => module.formationId === formationId);
+  };
+
+  const getFormationQuestions = (formationId: string): Question[] => {
+    return questions.filter((question) => question.formationId === formationId);
+  };
+
+  const getFormationEvaluationTest = (
+    formationId: string
+  ): EvaluationTest | null => {
+    return (
+      evaluationTests.find((test) => test.formationId === formationId) || null
+    );
+  };
+
   const getModuleById = (moduleId: string) => {
     return modules.find((module) => module.id === moduleId);
   };
@@ -260,48 +432,30 @@ const ResourcesInterface = () => {
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "video":
-        return <VideoIcon size={16} />;
-      case "pdf":
-        return <FileTextIcon size={16} />;
-      case "text":
-        return <BookOpenIcon size={16} />;
-      case "link":
-        return <LinkIcon size={16} />;
-      default:
-        return <FileTextIcon size={16} />;
-    }
+  const getModuleResources = (moduleId: string) => {
+    return resources.filter((resource) => resource.moduleId === moduleId);
   };
 
-  const getTypeBadge = (type: string) => {
-    const colors = {
-      video: "bg-red-100 text-red-800",
-      pdf: "bg-blue-100 text-blue-800",
-      text: "bg-green-100 text-green-800",
-      link: "bg-purple-100 text-purple-800",
-    };
+  const getFormationStats = (formationId: string) => {
+    const formationModules = getFormationModules(formationId);
+    let totalResources = 0;
+    let completedResources = 0;
+    let totalDuration = 0;
 
-    return (
-      <span
-        className={`px-3 py-1 rounded-full text-xs font-medium ${
-          colors[type] || colors.text
-        }`}
-      >
-        {type.toUpperCase()}
-      </span>
-    );
+    formationModules.forEach((module) => {
+      const moduleResources = getModuleResources(module.id);
+      totalResources += moduleResources.length;
+      completedResources += moduleResources.filter((r) => r.isCompleted).length;
+      totalDuration += moduleResources.reduce(
+        (sum, r) => sum + (r.duration || 0),
+        0
+      );
+    });
+
+    return { totalResources, completedResources, totalDuration };
   };
 
-  const formatDuration = (minutes: number | undefined) => {
-    if (!minutes) return "0 min";
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
-  };
-
-  const toggleFormation = (formationId: unknown) => {
+  const toggleFormation = (formationId: string) => {
     const newExpanded = new Set(expandedFormations);
     if (newExpanded.has(formationId)) {
       newExpanded.delete(formationId);
@@ -311,40 +465,270 @@ const ResourcesInterface = () => {
     setExpandedFormations(newExpanded);
   };
 
-  const getFormationModules = (formationId: string) => {
-    return modules
-      .filter((module) => module.formationId === formationId)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
   };
 
-  const getModuleResources = (moduleId: string) => {
-    return resources.filter((resource) => resource.moduleId === moduleId);
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "video":
+        return <PlayIcon size={16} />;
+      case "pdf":
+        return <FolderIcon size={16} />;
+      default:
+        return <FolderIcon size={16} />;
+    }
   };
 
-  const getFormationResources = (formationId: string) => {
-    const formationModules = getFormationModules(formationId);
-    const allResources: ResourceEntity[] = [];
+  const getTypeBadge = (type: string) => {
+    const colors = {
+      video: "from-red-100 to-pink-100 text-red-800",
+      pdf: "from-green-100 to-teal-100 text-green-800",
+      text: "from-blue-100 to-indigo-100 text-blue-800",
+    };
 
-    formationModules.forEach((module) => {
-      const moduleResources = getModuleResources(module.id);
-      allResources.push(...moduleResources);
+    return (
+      <span
+        className={`bg-gradient-to-r ${
+          colors[type] || colors.text
+        } px-3 py-1 rounded-full text-xs font-medium uppercase`}
+      >
+        {type}
+      </span>
+    );
+  };
+
+  const addQuestionToFormation = async (
+    formationId: string,
+    newQuestion: Omit<Question, "id">
+  ) => {
+    try {
+      const response = await fetch("http://127.0.0.1:3001/questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...newQuestion,
+          formationId: formationId,
+        }),
+      });
+
+      if (response.ok) {
+        const createdQuestion = await response.json();
+        setQuestions((prev) => [...prev, createdQuestion]);
+        return createdQuestion;
+      }
+    } catch (error) {
+      console.error("Error adding question:", error);
+    }
+  };
+
+  const createEvaluationTestWithQuestions = (
+    formationId: string
+  ): EvaluationTest | null => {
+    const existingTest = getFormationEvaluationTest(formationId);
+    const formationQuestions = getFormationQuestions(formationId);
+
+    if (existingTest) {
+      return {
+        ...existingTest,
+        questions: formationQuestions,
+      };
+    } else if (formationQuestions.length > 0) {
+      return {
+        id: `temp-${formationId}`,
+        isEnabled: false,
+        title: "Test d'évaluation",
+        timeLimit: 30,
+        passingScore: 70,
+        description: "Test d'évaluation automatiquement généré",
+        questions: formationQuestions,
+        formationId: formationId,
+      };
+    }
+
+    return null;
+  };
+
+  const openQuestionsDrawer = (formationId: string) => {
+    const formationQuestions = getFormationQuestions(formationId);
+    setSelectedFormationQuestions(formationQuestions);
+    setSelectedFormationId(formationId);
+    setQuestionsDrawerOpen(true);
+  };
+
+  const handleQuizEdit = (quiz: Quiz) => {
+    setSelectedQuiz(quiz);
+    setEditingQuizData({ ...quiz });
+    setIsEditingQuiz(true);
+    setIsPlayingQuiz(false);
+    setIsQuizDrawerOpen(true);
+  };
+
+  const handleQuizStart = (quiz: Quiz) => {
+    setSelectedQuiz(quiz);
+    setIsPlayingQuiz(true);
+    setIsEditingQuiz(false);
+    setCurrentQuestionIndex(0);
+    setUserAnswers([]);
+    setQuizResults(null);
+    setIsQuizDrawerOpen(true);
+  };
+
+  const getModuleQuizzes = (moduleId: string) => {
+    return quizzesByModule[moduleId] || [];
+  };
+
+  const handleQuizSave = async () => {
+    if (!editingQuizData) return;
+
+    try {
+      const response = await fetch("http://127.0.0.1:3001/quizzes/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editingQuizData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to create resource");
+      }
+
+      const result = await response.json();
+
+      setQuizzes((prevQuizzes) =>
+        prevQuizzes.map((q) =>
+          q.id === editingQuizData.id ? editingQuizData : q
+        )
+      );
+
+      setIsQuizDrawerOpen(false);
+      setEditingQuizData(null);
+
+      return result.data;
+    } catch (error) {
+      console.error("Error saving quiz:", error);
+    }
+  };
+
+  const handleAnswerSelect = (answerIndex: number) => {
+    const newAnswers = [...userAnswers];
+    newAnswers[currentQuestionIndex] = answerIndex;
+    setUserAnswers(newAnswers);
+  };
+
+  const handleNextQuestion = () => {
+    if (!selectedQuiz) return;
+
+    if (currentQuestionIndex < selectedQuiz.questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      // Calculate results
+      const correctAnswers = selectedQuiz.questions.reduce(
+        (count, question, index) => {
+          return userAnswers[index] === question.correctAnswer
+            ? count + 1
+            : count;
+        },
+        0
+      );
+
+      setQuizResults({
+        score: correctAnswers,
+        total: selectedQuiz.questions.length,
+      });
+    }
+  };
+
+  const handlePrevQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    }
+  };
+
+  const closeQuizDrawer = () => {
+    setIsQuizDrawerOpen(false);
+    setSelectedQuiz(null);
+    setEditingQuizData(null);
+    setIsEditingQuiz(false);
+    setIsPlayingQuiz(false);
+    setCurrentQuestionIndex(0);
+    setUserAnswers([]);
+    setQuizResults(null);
+  };
+
+  const addQuestion = () => {
+    if (!editingQuizData) return;
+
+    const newQuestion: QuizQuestion = {
+      id: Date.now().toString(),
+      question: "",
+      options: ["", "", "", ""],
+      correctAnswer: 0,
+    };
+
+    setEditingQuizData({
+      ...editingQuizData,
+      questions: [...editingQuizData.questions, newQuestion],
+    });
+  };
+
+  const updateQuestion = (questionIndex: number, field: string, value: any) => {
+    if (!editingQuizData) return;
+
+    const updatedQuestions = editingQuizData.questions.map((q, index) => {
+      if (index === questionIndex) {
+        return { ...q, [field]: value };
+      }
+      return q;
     });
 
-    return allResources;
+    setEditingQuizData({
+      ...editingQuizData,
+      questions: updatedQuestions,
+    });
   };
 
-  const getFormationStats = (formationId: string) => {
-    const formationResources = getFormationResources(formationId);
-    const totalResources = formationResources.length;
-    const completedResources = formationResources.filter(
-      (r) => r.isCompleted
-    ).length;
-    const totalDuration = formationResources.reduce(
-      (sum, r) => sum + (r.duration || 0),
-      0
-    );
+  const updateQuestionOption = (
+    questionIndex: number,
+    optionIndex: number,
+    value: string
+  ) => {
+    if (!editingQuizData) return;
 
-    return { totalResources, completedResources, totalDuration };
+    const updatedQuestions = editingQuizData.questions.map((q, index) => {
+      if (index === questionIndex) {
+        const newOptions = [...q.options];
+        newOptions[optionIndex] = value;
+        return { ...q, options: newOptions };
+      }
+      return q;
+    });
+
+    setEditingQuizData({
+      ...editingQuizData,
+      questions: updatedQuestions,
+    });
+  };
+
+  const removeQuestion = (questionIndex: number) => {
+    if (!editingQuizData) return;
+
+    const updatedQuestions = editingQuizData.questions.filter(
+      (_, index) => index !== questionIndex
+    );
+    setEditingQuizData({
+      ...editingQuizData,
+      questions: updatedQuestions,
+    });
   };
 
   const filteredData = useMemo(() => {
@@ -361,19 +745,60 @@ const ResourcesInterface = () => {
       const formationMatch = formation.titre
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
-      const resourceMatch = getFormationResources(formation.id).some(
-        (resource) =>
-          resource.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          resource.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      const formationModules = getFormationModules(formation.id);
+      const evaluationTest = createEvaluationTestWithQuestions(formation.id);
+
+      const resourceMatch = formationModules.some((module) =>
+        getModuleResources(module.id).some(
+          (resource) =>
+            resource.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            resource.description
+              ?.toLowerCase()
+              .includes(searchTerm.toLowerCase())
+        )
       );
-      return formationMatch || resourceMatch;
+
+      const testMatch =
+        evaluationTest &&
+        (evaluationTest.title
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+          evaluationTest.description
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          evaluationTest.questions.some((q) =>
+            q.question.toLowerCase().includes(searchTerm.toLowerCase())
+          ));
+
+      return formationMatch || resourceMatch || testMatch;
     });
-  }, [searchTerm, formations, resources, modules]);
+  }, [
+    searchTerm,
+    formations,
+    resources,
+    modules,
+    ,
+    questions,
+    evaluationTests,
+  ]);
 
   const currentModule = getModuleById(editData.moduleId);
   const currentFormation = currentModule
     ? getFormationByModuleId(editData.moduleId)
     : null;
+
+  const evaluationTest = createEvaluationTestWithQuestions(selectedFormationId);
+
+  if (loading && formations.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4 mx-auto"></div>
+          <p className="text-gray-600">Chargement des formations...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
@@ -525,6 +950,126 @@ const ResourcesInterface = () => {
                         </td>
                       </tr>
 
+                      {isExpanded && (
+                        <tr className="bg-gradient-to-r from-orange-50/50 to-red-50/50 hover:from-orange-100/50 hover:to-red-100/50 transition-all duration-300">
+                          <td className="py-3 px-6 pl-12">
+                            <div className="w-4 h-4 border-l-2 border-b-2 border-orange-300"></div>
+                          </td>
+                          <td className="py-3 px-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-400 rounded-lg flex items-center justify-center text-white">
+                                <ClipboardCheckIcon size={16} />
+                              </div>
+                              <div>
+                                <div className="font-semibold text-gray-800">
+                                  {evaluationTest?.title || "Test d'évaluation"}
+                                </div>
+                                <div className="text-sm text-gray-500 mt-1">
+                                  {evaluationTest ? (
+                                    <>
+                                      {evaluationTest.questions.length} question
+                                      {evaluationTest.questions.length > 1
+                                        ? "s"
+                                        : ""}{" "}
+                                      •{evaluationTest.timeLimit}min •
+                                      {evaluationTest.passingScore}% requis
+                                    </>
+                                  ) : (
+                                    "Aucun test configuré"
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-6">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                evaluationTest?.isEnabled
+                                  ? "bg-gradient-to-r from-green-100 to-emerald-100 text-green-800"
+                                  : "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600"
+                              }`}
+                            >
+                              {evaluationTest?.isEnabled ? "ACTIF" : "INACTIF"}
+                            </span>
+                          </td>
+                          <td className="py-3 px-6">
+                            <div className="text-sm text-gray-600">
+                              {evaluationTest?.questions.length || 0} question
+                              {(evaluationTest?.questions.length || 0) > 1
+                                ? "s"
+                                : ""}
+                            </div>
+                          </td>
+                          <td className="py-3 px-6">
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <ClockIcon size={14} />
+                              <span className="text-sm">
+                                {evaluationTest?.timeLimit
+                                  ? `${evaluationTest.timeLimit}min`
+                                  : "--"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-6">
+                            <div className="text-sm text-gray-600">
+                              {evaluationTest?.passingScore
+                                ? `${evaluationTest.passingScore}%`
+                                : "--"}
+                            </div>
+                          </td>
+                          <td className="py-3 px-6">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() =>
+                                  openQuestionsDrawer(formation.id)
+                                }
+                                className="p-1 hover:bg-white/50 rounded transition-colors text-purple-600 hover:text-purple-700"
+                                title="Voir les questions"
+                              >
+                                <ListIcon size={16} />
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setSelectedFormationId(formation.id);
+                                  setAddQuestionDrawerOpen(true);
+                                }}
+                                className="p-1 hover:bg-white/50 rounded transition-colors text-indigo-600 hover:text-indigo-700"
+                                title="Ajouter une question"
+                              >
+                                <PlusIcon size={16} />
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setSelectedTest(evaluationTest);
+                                  setSelectedFormationId(formation.id);
+                                  setEditTestDrawerOpen(true);
+                                }}
+                                className="p-1 hover:bg-white/50 rounded transition-colors text-blue-600 hover:text-blue-700"
+                                title="Modifier le test"
+                              >
+                                <EditIcon size={16} />
+                              </button>
+
+                              {evaluationTest &&
+                                evaluationTest.questions.length > 0 && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedTest(evaluationTest);
+                                      setTestDrawerOpen(true);
+                                    }}
+                                    className="p-1 hover:bg-white/50 rounded transition-colors text-green-600 hover:text-green-700"
+                                    title="Passer le test"
+                                  >
+                                    <PlayIcon size={16} />
+                                  </button>
+                                )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
                       {/* Module and Resource Rows */}
                       {isExpanded &&
                         formationModules.map((module) => {
@@ -541,6 +1086,7 @@ const ResourcesInterface = () => {
                                 .includes(searchTerm.toLowerCase())
                             );
                           });
+                          const moduleQuizzes = getModuleQuizzes(module.id);
 
                           return (
                             <React.Fragment key={module.id}>
@@ -706,6 +1252,91 @@ const ResourcesInterface = () => {
                                   </td>
                                 </tr>
                               ))}
+
+                              {moduleQuizzes.map((quiz) => (
+                                <tr
+                                  key={quiz.id}
+                                  className="hover:bg-purple-50/30 transition-all duration-300 group bg-gray-50/30"
+                                >
+                                  <td className="py-3 px-6 pl-16">
+                                    <div className="w-4 h-4 border-l-2 border-b-2 border-gray-300"></div>
+                                  </td>
+                                  <td className="py-3 px-6">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-400 rounded-lg flex items-center justify-center text-white">
+                                        <HelpCircleIcon size={16} />
+                                      </div>
+                                      <div>
+                                        <div className="font-semibold text-gray-800">
+                                          {quiz.title}
+                                        </div>
+                                        {quiz.description && (
+                                          <div className="text-sm text-gray-500 mt-1">
+                                            {quiz.description.length > 40
+                                              ? `${quiz.description.substring(
+                                                  0,
+                                                  40
+                                                )}...`
+                                              : quiz.description}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-6">
+                                    <span className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 px-3 py-1 rounded-full text-xs font-medium">
+                                      QUIZ
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-6">
+                                    <div className="flex items-center gap-2 text-gray-600">
+                                      <LayersIcon size={14} />
+                                      <div className="text-sm">
+                                        {module.titre}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-6">
+                                    <div className="flex items-center gap-2 text-gray-600">
+                                      <HelpCircleIcon size={14} />
+                                      <span className="text-sm">
+                                        {quiz.questions?.length || 0} question
+                                        {(quiz.questions?.length || 0) > 1
+                                          ? "s"
+                                          : ""}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-6">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-2 text-purple-600">
+                                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                                        <span className="text-sm">
+                                          Disponible
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-6">
+                                    <div className="flex items-center justify-center space-x-2">
+                                      <button
+                                        onClick={() => handleQuizEdit(quiz)}
+                                        className="text-purple-600 hover:text-purple-900 p-1.5 rounded-lg hover:bg-purple-50 transition-all"
+                                        title="Modifier le quiz"
+                                      >
+                                        <Edit3Icon size={16} />
+                                      </button>
+                                      <button
+                                        onClick={() => handleQuizStart(quiz)}
+                                        className="text-green-600 hover:text-green-900 p-1.5 rounded-lg hover:bg-green-50 transition-all"
+                                        title="Démarrer le quiz"
+                                      >
+                                        <PlayIcon size={16} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
                             </React.Fragment>
                           );
                         })}
@@ -768,6 +1399,248 @@ const ResourcesInterface = () => {
                   ? "Suppression..."
                   : "Supprimer"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isQuizDrawerOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h2 className="text-xl font-semibold">
+                {isEditingQuiz
+                  ? "Modifier le Quiz"
+                  : isPlayingQuiz
+                  ? "Quiz en cours"
+                  : "Quiz"}
+              </h2>
+              <button
+                onClick={closeQuizDrawer}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <XIcon size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {isEditingQuiz && editingQuizData ? (
+                // Edit Mode
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium">Questions</h3>
+                      <button
+                        onClick={addQuestion}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                      >
+                        Ajouter une question
+                      </button>
+                    </div>
+
+                    {editingQuizData.questions?.map(
+                      (question, questionIndex) => (
+                        <div
+                          key={question.id}
+                          className="border border-gray-200 rounded-lg p-4"
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <label className="block text-sm font-medium">
+                              Question {questionIndex + 1}
+                            </label>
+                            <button
+                              onClick={() => removeQuestion(questionIndex)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2Icon size={16} />
+                            </button>
+                          </div>
+
+                          <input
+                            type="text"
+                            value={question.question}
+                            onChange={(e) =>
+                              updateQuestion(
+                                questionIndex,
+                                "question",
+                                e.target.value
+                              )
+                            }
+                            className="w-full p-3 border border-gray-300 rounded-lg mb-3"
+                            placeholder="Tapez votre question..."
+                          />
+
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium">
+                              Options de réponse
+                            </label>
+                            {question.options?.map((option, optionIndex) => (
+                              <div
+                                key={optionIndex}
+                                className="flex items-center gap-2"
+                              >
+                                <input
+                                  type="radio"
+                                  name={`correct-${questionIndex}`}
+                                  checked={
+                                    question.correctAnswer === optionIndex
+                                  }
+                                  onChange={() =>
+                                    updateQuestion(
+                                      questionIndex,
+                                      "correctAnswer",
+                                      optionIndex
+                                    )
+                                  }
+                                  className="text-green-600"
+                                />
+                                <input
+                                  type="text"
+                                  value={option}
+                                  onChange={(e) =>
+                                    updateQuestionOption(
+                                      questionIndex,
+                                      optionIndex,
+                                      e.target.value
+                                    )
+                                  }
+                                  className="flex-1 p-2 border border-gray-300 rounded-lg"
+                                  placeholder={`Option ${optionIndex + 1}`}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={closeQuizDrawer}
+                      className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleQuizSave}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Sauvegarder
+                    </button>
+                  </div>
+                </div>
+              ) : isPlayingQuiz && selectedQuiz ? (
+                // Play Mode
+                <div className="space-y-6">
+                  {quizResults ? (
+                    // Results
+                    <div className="text-center space-y-4">
+                      <div className="text-6xl mb-4">
+                        {quizResults.score === quizResults.total
+                          ? "🎉"
+                          : quizResults.score >= quizResults.total * 0.7
+                          ? "👏"
+                          : "📚"}
+                      </div>
+                      <h3 className="text-2xl font-bold">Quiz terminé!</h3>
+                      <div className="text-lg">
+                        Votre score:{" "}
+                        <span className="font-bold text-blue-600">
+                          {quizResults.score}/{quizResults.total}
+                        </span>
+                      </div>
+                      <div className="text-gray-600">
+                        {quizResults.score === quizResults.total
+                          ? "Parfait! Vous maîtrisez le sujet!"
+                          : quizResults.score >= quizResults.total * 0.7
+                          ? "Bien joué! Bon travail!"
+                          : "Continuez à apprendre, vous y arriverez!"}
+                      </div>
+                      <button
+                        onClick={closeQuizDrawer}
+                        className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+                      >
+                        Fermer
+                      </button>
+                    </div>
+                  ) : (
+                    // Question
+                    <div className="space-y-6">
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm text-gray-600">
+                          Question {currentQuestionIndex + 1} sur{" "}
+                          {selectedQuiz.questions?.length || 0}
+                        </div>
+                        <div className="w-full max-w-xs bg-gray-200 rounded-full h-2 ml-4">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${
+                                ((currentQuestionIndex + 1) /
+                                  (selectedQuiz.questions?.length || 1)) *
+                                100
+                              }%`,
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-50 p-6 rounded-lg">
+                        <h3 className="text-xl font-semibold mb-6">
+                          {
+                            selectedQuiz.questions?.[currentQuestionIndex]
+                              ?.question
+                          }
+                        </h3>
+
+                        <div className="space-y-3">
+                          {selectedQuiz.questions?.[
+                            currentQuestionIndex
+                          ]?.options?.map((option, index) => (
+                            <button
+                              key={index}
+                              onClick={() => handleAnswerSelect(index)}
+                              className={`w-full p-4 text-left border rounded-lg transition-all ${
+                                userAnswers[currentQuestionIndex] === index
+                                  ? "border-blue-500 bg-blue-50 text-blue-900"
+                                  : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+                              }`}
+                            >
+                              <span className="font-medium mr-3">
+                                {String.fromCharCode(65 + index)}.
+                              </span>
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <button
+                          onClick={handlePrevQuestion}
+                          disabled={currentQuestionIndex === 0}
+                          className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Précédent
+                        </button>
+                        <button
+                          onClick={handleNextQuestion}
+                          disabled={
+                            userAnswers[currentQuestionIndex] === undefined
+                          }
+                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {currentQuestionIndex ===
+                          (selectedQuiz.questions?.length || 0) - 1
+                            ? "Terminer"
+                            : "Suivant"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
