@@ -9,6 +9,7 @@ import {
   PlusIcon,
   SaveIcon,
   SearchIcon,
+  SquareArrowOutUpRight,
   Trash2Icon,
   UserIcon,
   XIcon,
@@ -426,6 +427,13 @@ const ParticipantInterface = () => {
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-end space-x-3">
+                        <Link
+                          href={`/dashboard/formateur/participants/${user.id}`}
+                        >
+                          <button>
+                            <SquareArrowOutUpRight className="h-4 w-4" />
+                          </button>
+                        </Link>
                         <button
                           onClick={() => handleEdit(user)}
                           className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-all"

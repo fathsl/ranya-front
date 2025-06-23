@@ -14,6 +14,7 @@ import {
   MailIcon,
   UsersIcon,
 } from "lucide-react";
+import UpdateProfileDialog from "@/components/UpdateProfileDialog";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -22,8 +23,17 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAccessDenied, setShowAccessDenied] = useState(false);
+  const [showUpdateProfileDialog, setShowUpdateProfileDialog] = useState(false);
   const router = useRouter();
   const { user, setUser } = useAuth();
+
+  const [profileData, setProfileData] = useState({
+    name: "",
+    telephone: "",
+    linkedInLink: "",
+    password: "",
+    confirmPassword: "",
+  });
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -55,6 +65,15 @@ export default function LoginPage() {
         if (data.user.role === "formateur") {
           router.push("/dashboard/formateur/dashboard");
         } else if (data.user.role === "participant") {
+          // setProfileData({
+          //   name: data.user.name || "",
+          //   telephone: data.user.telephone || "",
+          //   linkedInLink: data.user.linkedInLink || "",
+          //   password: "",
+          //   confirmPassword: "",
+          // });
+          // setShowUpdateProfileDialog(true);
+
           router.push("/dashboard/participant/dashboard");
         } else {
           router.push("/dashboard/formateur/dashboard");
@@ -75,6 +94,60 @@ export default function LoginPage() {
     // Clear form fields
     setEmail("");
     setPassword("");
+  };
+
+  const handleUpdateProfile = async () => {
+    if (
+      profileData.password &&
+      profileData.password !== profileData.confirmPassword
+    ) {
+      setError("Les mots de passe ne correspondent pas");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const submitData = {
+        name: profileData.name,
+        telephone: profileData.telephone,
+        linkedInLink: profileData.linkedInLink,
+        ...(profileData.password && { password: profileData.password }),
+      };
+
+      const res = await fetch(`/api/users/${user?.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(submitData),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const updatedUser = { ...user, ...data };
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        setShowUpdateProfileDialog(false);
+        router.push("/dashboard/participant/dashboard");
+      } else {
+        setError(data.error || "Erreur lors de la mise à jour du profil");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du profil :", error);
+      setError("Erreur lors de la mise à jour du profil");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const skipProfileUpdate = () => {
+    setShowUpdateProfileDialog(false);
+    router.push("/dashboard/participant/dashboard");
   };
 
   return (
@@ -279,6 +352,13 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
+        <UpdateProfileDialog
+          isOpen={showUpdateProfileDialog}
+          onClose={skipProfileUpdate}
+          onSubmit={handleUpdateProfile}
+          currentUser={user}
+          loading={loading}
+        />
         <AccessDeniedDialog
           isOpen={showAccessDenied}
           onClose={handleCloseAccessDenied}
