@@ -5,8 +5,10 @@ import {
   BookOpenIcon,
   CalendarIcon,
   CheckCircleIcon,
+  CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CircleIcon,
   ClockIcon,
   EyeIcon,
   FileIcon,
@@ -20,7 +22,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface ModuleEntity {
   id: string;
@@ -63,6 +65,7 @@ interface ResourceEntity {
   fileSize?: number;
   previewUrl?: string;
   moduleId: string;
+  isCompleted?: boolean;
 }
 
 export interface Formation {
@@ -92,7 +95,7 @@ const FormationDetailsParticipant = () => {
   const params = useParams();
   const router = useRouter();
   const formationId = params.formationId as string;
-
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [formation, setFormation] = useState<Formation | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
@@ -101,6 +104,10 @@ const FormationDetailsParticipant = () => {
   const { user } = useAuth();
   const [expandedModules, setExpandedModules] = useState(new Set());
   const [expandedResources, setExpandedResources] = useState(new Set());
+  const [moduleQuizScores, setModuleQuizScores] = useState<
+    Record<string, number>
+  >({});
+  const [allResourcesCompleted, setAllResourcesCompleted] = useState(false);
 
   const getImageUrl = (imageName: string | null | undefined) => {
     if (!imageName) return null;
@@ -218,23 +225,6 @@ const FormationDetailsParticipant = () => {
     }
   };
 
-  const getTotalDuration = () => {
-    if (!formation?.modules) return 0;
-    return formation.modules.reduce((total, module) => {
-      const moduleDuration =
-        module.resources?.reduce((sum, resource) => {
-          return sum + (resource.duration || 0);
-        }, 0) || 0;
-      return total + moduleDuration;
-    }, 0);
-  };
-
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
-  };
-
   const getYouTubeEmbedUrl = (url: string) => {
     if (!url || typeof url !== "string") {
       return "";
@@ -285,23 +275,246 @@ const FormationDetailsParticipant = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
 
-  const renderResourceContent = (resource: ResourceEntity) => {
+    if (hours > 0) {
+      return `${hours}h ${minutes}min ${remainingSeconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}min ${remainingSeconds}s`;
+    } else {
+      return `${remainingSeconds}s`;
+    }
+  };
+
+  const updateResourceCompletion = async (
+    resourceId: string,
+    isCompleted: boolean
+  ) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:3001/resources/${resourceId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ isCompleted }),
+        }
+      );
+
+      if (!response.ok) {
+        let errorMessage = "Failed to update resource";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          // If response is not JSON, use default message
+        }
+        throw new Error(errorMessage);
+      }
+
+      const updatedResource = await response.json();
+
+      // Update local state or refetch data
+      // You might want to update your resources state here
+      checkAllResourcesCompleted();
+
+      return updatedResource;
+    } catch (error) {
+      console.error("Error updating resource:", error);
+      throw error;
+    }
+  };
+
+  // Function to update quiz score
+  const updateQuizScore = async (
+    moduleId: string,
+    formationId: string,
+    score: number
+  ) => {
+    try {
+      // First try to get existing quiz for this module
+      const quiz = await fetch(
+        `http://127.0.0.1:3001/quizzes/module/${moduleId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      let quizData;
+      if (quiz.ok) {
+        // Quiz exists, update it
+        quizData = await quiz.json();
+        const response = await fetch(
+          `http://127.0.0.1:3001/quizzes/${quizData.id}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ score }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to update quiz score");
+        }
+
+        quizData = await response.json();
+      } else {
+        // Quiz doesn't exist, create it
+        const response = await fetch(`http://127.0.0.1:3001/quizzes`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            moduleId,
+            formationId,
+            score,
+            isActive: true,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to create quiz score");
+        }
+
+        quizData = await response.json();
+      }
+
+      // Update local state
+      setModuleQuizScores((prev) => ({
+        ...prev,
+        [moduleId]: score,
+      }));
+
+      checkAllResourcesCompleted();
+
+      return quizData;
+    } catch (error) {
+      console.error("Error updating quiz score:", error);
+      throw error;
+    }
+  };
+
+  // Function to check if all resources are completed and scores meet requirements
+  const checkAllResourcesCompleted = () => {
+    if (!formation?.modules) return;
+
+    let allCompleted = true;
+    let allScoresPassing = true;
+
+    formation.modules.forEach((module) => {
+      // Check if all resources in this module are completed
+      if (module.resources) {
+        const moduleResourcesCompleted = module.resources.every(
+          (resource) => resource.isCompleted
+        );
+        if (!moduleResourcesCompleted) {
+          allCompleted = false;
+        }
+      }
+
+      // Check if module quiz score is above 97%
+      const moduleScore = moduleQuizScores[module.id] || 0;
+      if (moduleScore < 97) {
+        allScoresPassing = false;
+      }
+    });
+
+    setAllResourcesCompleted(allCompleted && allScoresPassing);
+  };
+
+  
+  const renderResourceContent = (
+    resource: ResourceEntity,
+    onToggleCompletion?: (resourceId: string, isCompleted: boolean) => void
+  ) => {
     const isExpanded = expandedResources.has(resource.id);
     if (!isExpanded) return null;
+
+    const CompletionToggle = () => (
+      <div className="flex items-center gap-2 mb-3">
+        <button
+          onClick={async () => {
+            try {
+              await updateResourceCompletion(
+                resource.id,
+                !resource.isCompleted
+              );
+              onToggleCompletion?.(resource.id, !resource.isCompleted);
+            } catch (error) {
+              console.error("Failed to toggle completion:", error);
+              // You might want to show a toast notification here
+            }
+          }}
+          className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+            resource.isCompleted
+              ? "bg-green-100 text-green-800 hover:bg-green-200"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+          }`}
+        >
+          {resource.isCompleted ? (
+            <>
+              <CheckIcon size={16} />
+              Terminé
+            </>
+          ) : (
+            <>
+              <CircleIcon size={16} />
+              Marquer comme terminé
+            </>
+          )}
+        </button>
+      </div>
+    );
+
+    // Helper function to get file extension
+    const getFileExtension = (filename: string) => {
+      return filename.split(".").pop()?.toLowerCase() || "";
+    };
+
+    // Helper function to handle document click
+    const handleDocumentClick = () => {
+      const url = resource.url || resource.previewUrl;
+      if (!url) {
+        console.warn("No URL available for document:", resource);
+        return;
+      }
+
+      const extension = resource.fileName
+        ? getFileExtension(resource.fileName)
+        : "";
+
+      // For PDF files, open directly
+      if (extension === "pdf" || resource.type === "pdf") {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        // For other document types, open in new window
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    };
 
     switch (resource.type) {
       case "image":
         return (
           <div className="mt-3 p-4 bg-white rounded-lg border shadow-sm">
             <div className="flex justify-between items-center mb-3">
-              <h4 className="font-medium text-gray-800">Aperçu de l'image</h4>
+              <h4 className="font-medium text-gray-800">Aperçu de l&apos;image</h4>
               {resource.fileSize && (
                 <span className="text-sm text-gray-500">
                   {formatFileSize(resource.fileSize)}
                 </span>
               )}
             </div>
+            <CompletionToggle />
             <div className="flex justify-center">
               {resource.previewUrl || resource.url ? (
                 <img
@@ -346,7 +559,8 @@ const FormationDetailsParticipant = () => {
                 </span>
               )}
             </div>
-            {resource.url ? (
+            <CompletionToggle />
+            {resource.url || resource.previewUrl ? (
               isYouTubeUrl(resource.url) ? (
                 <div
                   className="relative w-full"
@@ -363,11 +577,27 @@ const FormationDetailsParticipant = () => {
                 </div>
               ) : (
                 <video
+                  ref={videoRef}
+                  preload="auto"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
                   controls
                   className="w-full max-h-96 rounded-lg shadow-sm"
-                  preload="metadata"
                 >
-                  <source src={resource.url} type="video/mp4" />
+                  <source
+                    src={resource.url || resource.previewUrl}
+                    type="video/mp4"
+                  />
+                  <source
+                    src={resource.url || resource.previewUrl}
+                    type="video/webm"
+                  />
+                  <source
+                    src={resource.url || resource.previewUrl}
+                    type="video/ogg"
+                  />
                   Votre navigateur ne supporte pas la lecture vidéo.
                 </video>
               )
@@ -390,25 +620,29 @@ const FormationDetailsParticipant = () => {
                 </span>
               )}
             </div>
-            {resource.url ? (
+            <CompletionToggle />
+            {resource.url || resource.previewUrl ? (
               <>
-                <div className="border rounded-lg overflow-hidden">
+                <div
+                  className="border rounded-lg overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={handleDocumentClick}
+                >
                   <iframe
-                    src={`${resource.url}#toolbar=1&navpanes=1&scrollbar=1`}
-                    className="w-full h-96"
+                    src={`${
+                      resource.url || resource.previewUrl
+                    }#toolbar=1&navpanes=1&scrollbar=1`}
+                    className="w-full h-96 pointer-events-none"
                     title={resource.title}
                   />
                 </div>
                 <div className="mt-3 flex justify-center">
-                  <a
-                    href={resource.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={handleDocumentClick}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
                   >
                     <FileTextIcon size={16} />
                     Ouvrir dans un nouvel onglet
-                  </a>
+                  </button>
                 </div>
               </>
             ) : (
@@ -437,12 +671,31 @@ const FormationDetailsParticipant = () => {
                 )}
               </div>
             </div>
+            <CompletionToggle />
 
             {resource.content ? (
-              <div className="bg-gray-50 p-4 rounded-lg max-h-64 overflow-y-auto">
+              <div
+                className="bg-gray-50 p-4 rounded-lg max-h-64 overflow-y-auto cursor-pointer hover:bg-gray-100 transition-colors"
+                onClick={handleDocumentClick}
+              >
                 <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono">
                   {resource.content}
                 </pre>
+              </div>
+            ) : resource.url || resource.previewUrl ? (
+              <div
+                className="text-center py-8 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors border-2 border-dashed border-blue-300"
+                onClick={handleDocumentClick}
+              >
+                <FileIcon size={48} className="mx-auto text-blue-400 mb-3" />
+                <p className="text-blue-600 mb-3 font-medium">
+                  Cliquez pour ouvrir le document
+                </p>
+                {resource.fileName && (
+                  <p className="text-sm text-blue-500">
+                    Fichier: {resource.fileName}
+                  </p>
+                )}
               </div>
             ) : (
               <div className="text-center py-8 bg-gray-50 rounded-lg">
@@ -458,17 +711,15 @@ const FormationDetailsParticipant = () => {
               </div>
             )}
 
-            {resource.url && (
+            {(resource.url || resource.previewUrl) && (
               <div className="mt-3 flex justify-center">
-                <a
-                  href={resource.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={handleDocumentClick}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                 >
                   <FileIcon size={16} />
-                  Télécharger le document
-                </a>
+                  Ouvrir le document
+                </button>
               </div>
             )}
           </div>
@@ -486,6 +737,7 @@ const FormationDetailsParticipant = () => {
                 </span>
               )}
             </div>
+            <CompletionToggle />
             {resource.tableData &&
             resource.tableData.headers &&
             resource.tableData.data ? (
@@ -538,6 +790,7 @@ const FormationDetailsParticipant = () => {
       default:
         return (
           <div className="mt-3 p-4 bg-gray-50 rounded-lg border">
+            <CompletionToggle />
             <p className="text-gray-600 text-center">
               Type de ressource non pris en charge: {resource.type}
             </p>
@@ -732,16 +985,45 @@ const FormationDetailsParticipant = () => {
                         module.resources &&
                         module.resources.length > 0 && (
                           <div className="border-t border-gray-200 bg-gray-50 p-4">
-                            <h4 className="font-medium text-gray-700 mb-3">
-                              Ressources du module:
-                            </h4>
+                            <div className="flex justify-between items-center mb-3">
+                              <h4 className="font-medium text-gray-700">
+                                Ressources du module:
+                              </h4>
+                              <div className="flex items-center gap-4">
+                                {/* Progress indicator */}
+                                <div className="text-sm text-gray-600">
+                                  {
+                                    module.resources.filter(
+                                      (r) => r.isCompleted
+                                    ).length
+                                  }{" "}
+                                  / {module.resources.length} terminé(s)
+                                </div>
+                                {/* Score display */}
+                                {moduleQuizScores[module.id] && (
+                                  <div
+                                    className={`text-sm font-medium px-2 py-1 rounded ${
+                                      moduleQuizScores[module.id] >= 97
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-yellow-100 text-yellow-800"
+                                    }`}
+                                  >
+                                    Score: {moduleQuizScores[module.id]}%
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                             <div className="space-y-3">
                               {module.resources
                                 .sort((a, b) => a.order - b.order)
                                 .map((resource) => (
                                   <div key={resource.id} className="space-y-2">
                                     <div
-                                      className="flex items-center gap-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-gray-50 transition-colors border"
+                                      className={`flex items-center gap-3 p-3 bg-white rounded-lg cursor-pointer hover:bg-gray-50 transition-colors border ${
+                                        resource.isCompleted
+                                          ? "border-green-200 bg-green-50"
+                                          : ""
+                                      }`}
                                       onClick={() =>
                                         toggleResourceExpansion(resource.id)
                                       }
@@ -756,13 +1038,19 @@ const FormationDetailsParticipant = () => {
                                             {resource.description}
                                           </p>
                                         )}
-                                        {resource.originalName && (
+                                        {resource.fileName && (
                                           <p className="text-xs text-gray-500 mt-1">
-                                            Fichier: {resource.originalName}
+                                            Fichier: {resource.fileName}
                                           </p>
                                         )}
                                       </div>
                                       <div className="flex items-center gap-3">
+                                        {resource.isCompleted && (
+                                          <CheckIcon
+                                            size={16}
+                                            className="text-green-600"
+                                          />
+                                        )}
                                         {resource.duration && (
                                           <div className="flex items-center gap-1 text-gray-500">
                                             <ClockIcon size={14} />
@@ -780,7 +1068,10 @@ const FormationDetailsParticipant = () => {
                                         </div>
                                       </div>
                                     </div>
-                                    {renderResourceContent(resource)}
+                                    {renderResourceContent(
+                                      resource,
+                                      updateResourceCompletion
+                                    )}
                                   </div>
                                 ))}
                             </div>
@@ -814,16 +1105,6 @@ const FormationDetailsParticipant = () => {
                     <p className="text-sm text-gray-600">Participants</p>
                     <p className="font-semibold">
                       {formation.participants?.length || 0}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <ClockIcon className="text-orange-500" size={20} />
-                  <div>
-                    <p className="text-sm text-gray-600">Durée totale</p>
-                    <p className="font-semibold">
-                      {formatDuration(getTotalDuration())}
                     </p>
                   </div>
                 </div>
@@ -902,17 +1183,34 @@ const FormationDetailsParticipant = () => {
 
             {isEnrolled && (
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <button
-                  onClick={() =>
-                    router.push(
-                      `/dashboard/participant/formations/${formationId}/learn`
-                    )
-                  }
-                  className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-2"
-                >
-                  <PlayCircleIcon size={20} />
-                  Commencer l&apos;apprentissage
-                </button>
+                {allResourcesCompleted ? (
+                  <button
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/participant/formations/${formationId}/learn`
+                      )
+                    }
+                    className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-2"
+                  >
+                    <PlayCircleIcon size={20} />
+                    Commencer l&apos;apprentissage
+                  </button>
+                ) : (
+                  <div className="text-center">
+                    <button
+                      disabled
+                      className="w-full bg-gray-300 text-gray-500 py-3 px-6 rounded-lg font-semibold cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <PlayCircleIcon size={20} />
+                      Commencer l&apos;apprentissage
+                    </button>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Veuillez terminer toutes les ressources et obtenir un
+                      score minimum de 97% dans chaque module pour débloquer
+                      l&apos;apprentissage.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
