@@ -3,10 +3,10 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AwardIcon,
+  ChevronDownIcon,
   Edit3Icon,
   MailIcon,
   PhoneIcon,
-  PlusIcon,
   SaveIcon,
   SearchIcon,
   SquareArrowOutUpRight,
@@ -47,6 +47,10 @@ const ParticipantInterface = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditMenuOpen, setIsEditMenuOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedFormation, setSelectedFormation] = useState<string>("");
+  const [formations, setFormations] = useState<Formation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editData, setEditData] = useState<EditUserData>({
     name: "",
     email: "",
@@ -62,6 +66,36 @@ const ParticipantInterface = () => {
   const [isGeneratingCertificate, setIsGeneratingCertificate] = useState<
     string | null
   >(null);
+
+  useEffect(() => {
+    const fetchFormations = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch("http://127.0.0.1:3001/formations", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setFormations(data);
+      } catch (error: any) {
+        setError(error.message || "Unknown error");
+        console.error("Error fetching formations:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFormations();
+  }, []);
 
   useEffect(() => {
     fetchUsers();
@@ -172,13 +206,22 @@ const ParticipantInterface = () => {
     }
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
+  const filteredUsers = users.filter((user) => {
+    // Existing search logic
+    const matchesSearch =
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (user.telephone &&
-        user.telephone.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+        user.telephone.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    // Formation filter logic
+    const matchesFormation =
+      !selectedFormation ||
+      (user.formations &&
+        user.formations.some((f) => f.id === selectedFormation));
+
+    return matchesSearch && matchesFormation;
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("fr-FR", {
@@ -319,26 +362,50 @@ const ParticipantInterface = () => {
                 Gérez les utilisateurs participants et leurs informations
               </p>
             </div>
-            <Link href={"/dashboard/formateur/participants/ajouter"}>
+            {/* <Link href={"/dashboard/formateur/participants/ajouter"}>
               <button className="flex flex-row bg-blue-600 text-white px-6 py-2 rounded-md space-x-2">
                 <PlusIcon />
                 <span className="text-l font-bold">Ajouter</span>
               </button>
-            </Link>
+            </Link> */}
           </div>
 
-          <div className="relative mb-6">
-            <SearchIcon
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder="Rechercher un participant..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 bg-white/70 backdrop-blur-sm"
-            />
+          <div className="flex space-x-4 mb-6">
+            {/* Search input container */}
+            <div className="relative flex-grow">
+              <SearchIcon
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+                size={20}
+              />
+              <input
+                type="text"
+                placeholder="Rechercher un participant..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 bg-white/70 backdrop-blur-sm"
+              />
+            </div>
+
+            {/* Formation filter dropdown */}
+            <div className="relative">
+              <select
+                value={selectedFormation}
+                onChange={(e) => setSelectedFormation(e.target.value)}
+                className="w-full pl-4 pr-10 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 bg-white/70 backdrop-blur-sm appearance-none"
+                disabled={loading}
+              >
+                <option value="">Toutes les formations</option>
+                {formations.map((formation) => (
+                  <option key={formation.id} value={formation.id}>
+                    {formation.titre}
+                  </option>
+                ))}
+              </select>
+              <ChevronDownIcon
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"
+                size={18}
+              />
+            </div>
           </div>
         </div>
 

@@ -58,12 +58,11 @@ const UpdateProfileDialog = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
     if (formData.password && formData.password !== formData.confirmPassword) {
+      // Show error message
       return;
     }
 
-    // Only include password in submission if it's not empty
     const submitData = {
       name: formData.name,
       telephone: formData.telephone,
@@ -71,7 +70,7 @@ const UpdateProfileDialog = ({
       ...(formData.password && { password: formData.password }),
     };
 
-    onSubmit(submitData);
+    onSubmit(submitData); // This calls handleUpdateProfile
   };
 
   if (!isOpen) return null;
@@ -166,67 +165,6 @@ const UpdateProfileDialog = ({
                   }
                 />
               </div>
-            </div>
-
-            {/* Password Field */}
-            <div className="relative group">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nouveau mot de passe{" "}
-                <span className="text-gray-500 text-xs">(optionnel)</span>
-              </label>
-              <div className="relative">
-                <LockIcon
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors"
-                  size={20}
-                />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Nouveau mot de passe"
-                  className="w-full pl-12 pr-12 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-400"
-                  value={formData.password}
-                  onChange={handlePasswordChange}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  {showPassword ? (
-                    <EyeOffIcon size={20} />
-                  ) : (
-                    <EyeIcon size={20} />
-                  )}
-                </button>
-              </div>
-              {formData.password && (
-                <div className="mt-2">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-600">Force du mot de passe</span>
-                    <span
-                      className={`font-medium ${
-                        passwordStrength >= 3
-                          ? "text-green-600"
-                          : passwordStrength >= 2
-                          ? "text-yellow-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {getPasswordStrengthText()}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${getPasswordStrengthColor()}`}
-                      style={{
-                        width: `${Math.min(
-                          (passwordStrength / 4) * 100,
-                          100
-                        )}%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="flex gap-3 pt-4">

@@ -65,16 +65,16 @@ export default function LoginPage() {
         if (data.user.role === "formateur") {
           router.push("/dashboard/formateur/dashboard");
         } else if (data.user.role === "participant") {
-          // setProfileData({
-          //   name: data.user.name || "",
-          //   telephone: data.user.telephone || "",
-          //   linkedInLink: data.user.linkedInLink || "",
-          //   password: "",
-          //   confirmPassword: "",
-          // });
-          // setShowUpdateProfileDialog(true);
+          setProfileData({
+            name: data.user.name || "",
+            telephone: data.user.telephone || "",
+            linkedInLink: data.user.linkedInLink || "",
+            password: "",
+            confirmPassword: "",
+          });
+          setShowUpdateProfileDialog(true);
 
-          router.push("/dashboard/participant/dashboard");
+          // router.push("/dashboard/participant/dashboard");
         } else {
           router.push("/dashboard/formateur/dashboard");
         }
@@ -96,52 +96,34 @@ export default function LoginPage() {
     setPassword("");
   };
 
-  const handleUpdateProfile = async () => {
-    if (
-      profileData.password &&
-      profileData.password !== profileData.confirmPassword
-    ) {
-      setError("Les mots de passe ne correspondent pas");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
+  const handleUpdateProfile = async (profileData) => {
     try {
-      const token = localStorage.getItem("token");
-      const submitData = {
-        name: profileData.name,
-        telephone: profileData.telephone,
-        linkedInLink: profileData.linkedInLink,
-        ...(profileData.password && { password: profileData.password }),
-      };
-
       const res = await fetch(`/api/users/${user?.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${user?.token}`,
         },
-        body: JSON.stringify(submitData),
+        body: JSON.stringify(profileData),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        const updatedUser = { ...user, ...data };
+        // Update localStorage and global state
+        const updatedUser = { ...user, ...profileData };
         localStorage.setItem("user", JSON.stringify(updatedUser));
         setUser(updatedUser);
+
+        // Redirect or close dialog
         setShowUpdateProfileDialog(false);
         router.push("/dashboard/participant/dashboard");
       } else {
-        setError(data.error || "Erreur lors de la mise à jour du profil");
+        setError(data.message || "Erreur lors de la mise à jour");
       }
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour du profil :", error);
-      setError("Erreur lors de la mise à jour du profil");
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      setError("Impossible de mettre à jour le profil.");
     }
   };
 

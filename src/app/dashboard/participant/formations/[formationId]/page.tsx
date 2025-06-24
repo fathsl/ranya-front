@@ -1,4 +1,5 @@
 "use client";
+import QuizComponent from "@/components/QuizComponent";
 import { useAuth } from "@/contexts/authContext";
 import {
   ArrowLeftIcon,
@@ -12,6 +13,7 @@ import {
   ClockIcon,
   EyeIcon,
   FileIcon,
+  FileQuestionIcon,
   FileTextIcon,
   ImageIcon,
   PlayCircleIcon,
@@ -108,6 +110,10 @@ const FormationDetailsParticipant = () => {
     Record<string, number>
   >({});
   const [allResourcesCompleted, setAllResourcesCompleted] = useState(false);
+  const [currentQuizModuleId, setCurrentQuizModuleId] = useState<string | null>(
+    null
+  );
+  const [showQuiz, setShowQuiz] = useState(false);
 
   const getImageUrl = (imageName: string | null | undefined) => {
     if (!imageName) return null;
@@ -329,82 +335,6 @@ const FormationDetailsParticipant = () => {
     }
   };
 
-  // Function to update quiz score
-  const updateQuizScore = async (
-    moduleId: string,
-    formationId: string,
-    score: number
-  ) => {
-    try {
-      // First try to get existing quiz for this module
-      const quiz = await fetch(
-        `http://127.0.0.1:3001/quizzes/module/${moduleId}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      let quizData;
-      if (quiz.ok) {
-        // Quiz exists, update it
-        quizData = await quiz.json();
-        const response = await fetch(
-          `http://127.0.0.1:3001/quizzes/${quizData.id}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ score }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to update quiz score");
-        }
-
-        quizData = await response.json();
-      } else {
-        // Quiz doesn't exist, create it
-        const response = await fetch(`http://127.0.0.1:3001/quizzes`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            moduleId,
-            formationId,
-            score,
-            isActive: true,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to create quiz score");
-        }
-
-        quizData = await response.json();
-      }
-
-      // Update local state
-      setModuleQuizScores((prev) => ({
-        ...prev,
-        [moduleId]: score,
-      }));
-
-      checkAllResourcesCompleted();
-
-      return quizData;
-    } catch (error) {
-      console.error("Error updating quiz score:", error);
-      throw error;
-    }
-  };
-
-  // Function to check if all resources are completed and scores meet requirements
   const checkAllResourcesCompleted = () => {
     if (!formation?.modules) return;
 
@@ -432,7 +362,34 @@ const FormationDetailsParticipant = () => {
     setAllResourcesCompleted(allCompleted && allScoresPassing);
   };
 
-  
+  const handleQuizScoreUpdate = (moduleId: string, score: number) => {
+    setModuleQuizScores((prev) => {
+      const updatedScores = {
+        ...prev,
+        [moduleId]: score,
+      };
+
+      // Use setTimeout to ensure state update is complete before checking
+      setTimeout(() => {
+        checkAllResourcesCompleted();
+      }, 0);
+
+      return updatedScores;
+    });
+  };
+
+  // Function to open quiz for a module
+  const openQuiz = (moduleId: string) => {
+    setCurrentQuizModuleId(moduleId);
+    setShowQuiz(true);
+  };
+
+  // Function to close quiz
+  const closeQuiz = () => {
+    setShowQuiz(false);
+    setCurrentQuizModuleId(null);
+  };
+
   const renderResourceContent = (
     resource: ResourceEntity,
     onToggleCompletion?: (resourceId: string, isCompleted: boolean) => void
@@ -450,9 +407,13 @@ const FormationDetailsParticipant = () => {
                 !resource.isCompleted
               );
               onToggleCompletion?.(resource.id, !resource.isCompleted);
+
+              // Trigger completion check after updating resource
+              setTimeout(() => {
+                checkAllResourcesCompleted();
+              }, 0);
             } catch (error) {
               console.error("Failed to toggle completion:", error);
-              // You might want to show a toast notification here
             }
           }}
           className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium transition-colors ${
@@ -507,7 +468,9 @@ const FormationDetailsParticipant = () => {
         return (
           <div className="mt-3 p-4 bg-white rounded-lg border shadow-sm">
             <div className="flex justify-between items-center mb-3">
-              <h4 className="font-medium text-gray-800">Aperçu de l&apos;image</h4>
+              <h4 className="font-medium text-gray-800">
+                Aperçu de l&apos;image
+              </h4>
               {resource.fileSize && (
                 <span className="text-sm text-gray-500">
                   {formatFileSize(resource.fileSize)}
@@ -1074,6 +1037,31 @@ const FormationDetailsParticipant = () => {
                                     )}
                                   </div>
                                 ))}
+
+                              <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <FileQuestionIcon
+                                      size={20}
+                                      className="text-purple-500"
+                                    />
+                                    <div>
+                                      <p className="font-medium text-gray-800">
+                                        Quiz du module
+                                      </p>
+                                      <p className="text-sm text-gray-600">
+                                        Testez vos connaissances sur ce module
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => openQuiz(module.id)}
+                                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                                  >
+                                    Commencer le quiz
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -1159,6 +1147,15 @@ const FormationDetailsParticipant = () => {
               </span>
             </div>
 
+            {showQuiz && currentQuizModuleId && (
+              <QuizComponent
+                moduleId={currentQuizModuleId}
+                onClose={closeQuiz}
+                onScoreUpdate={handleQuizScoreUpdate}
+                user={user}
+              />
+            )}
+
             {!isEnrolled && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <button
@@ -1182,36 +1179,34 @@ const FormationDetailsParticipant = () => {
             )}
 
             {isEnrolled && (
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                {allResourcesCompleted ? (
-                  <button
-                    onClick={() =>
-                      router.push(
-                        `/dashboard/participant/formations/${formationId}/learn`
-                      )
-                    }
-                    className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-2"
-                  >
-                    <PlayCircleIcon size={20} />
-                    Commencer l&apos;apprentissage
-                  </button>
-                ) : (
-                  <div className="text-center">
-                    <button
-                      disabled
-                      className="w-full bg-gray-300 text-gray-500 py-3 px-6 rounded-lg font-semibold cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      <PlayCircleIcon size={20} />
-                      Commencer l&apos;apprentissage
-                    </button>
-                    <p className="text-sm text-gray-600 mt-2">
-                      Veuillez terminer toutes les ressources et obtenir un
-                      score minimum de 97% dans chaque module pour débloquer
-                      l&apos;apprentissage.
-                    </p>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() =>
+                  router.push(
+                    `/dashboard/participant/formations/${formationId}/learn`
+                  )
+                }
+                className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                <PlayCircleIcon size={20} />
+                Commencer l&apos;apprentissage
+              </button>
+              // <div className="bg-white rounded-xl shadow-lg p-6">
+              //   {allResourcesCompleted ? (
+
+              //   ) : (
+              //     <div className="text-center">
+              //       <button className="w-full bg-gray-300 text-gray-500 py-3 px-6 rounded-lg font-semibold cursor-not-allowed flex items-center justify-center gap-2">
+              //         <PlayCircleIcon size={20} />
+              //         Commencer l&apos;apprentissage
+              //       </button>
+              //       <p className="text-sm text-gray-600 mt-2">
+              //         Veuillez terminer toutes les ressources et obtenir un
+              //         score minimum de 97% dans chaque module pour débloquer
+              //         l&apos;apprentissage.
+              //       </p>
+              //     </div>
+              //   )}
+              // </div>
             )}
           </div>
         </div>
