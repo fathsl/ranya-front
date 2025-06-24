@@ -149,7 +149,7 @@ const ReminderDrawer = ({ isOpen, onClose, formation }) => {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity duration-300"
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity duration-300 overflow-y-auto"
         onClick={onClose}
       />
 
@@ -254,7 +254,7 @@ const ReminderDrawer = ({ isOpen, onClose, formation }) => {
                   {users.map((user) => (
                     <div
                       key={user.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all overflow-auto ${
                         selectedUserIds.includes(user.id)
                           ? "border-blue-500 bg-blue-50"
                           : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"

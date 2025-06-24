@@ -23,7 +23,7 @@ interface Participant {
   certificatObtenu: boolean;
   statusFormation: "Inscrit" | "En cours" | "Terminé" | "Annulé";
   isActive: boolean;
-  dateInscription: string;
+  createdAt: string;
   dateModification: string;
   formationId: string;
   formation?: {
@@ -314,7 +314,7 @@ const ParticipantsPage = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1 text-sm text-gray-600">
                           <CalendarIcon className="h-3 w-3" />
-                          {formatDate(participant.dateInscription)}
+                          {formatDate(participant.createdAt)}
                         </div>
                       </td>
                       <td className="px-6 py-4">

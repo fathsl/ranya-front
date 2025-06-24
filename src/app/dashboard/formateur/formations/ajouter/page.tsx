@@ -1802,7 +1802,7 @@ const FormationCreator = ({
 
   const generateLink = () => {
     const linkId = Math.random().toString(36).substring(2, 15);
-    const generatedLink = `https://your-platform.com/invite/${linkId}`;
+    const generatedLink = `http://localhost:3000/invite/${linkId}`;
 
     setInvitationData((prev) => ({
       ...prev,

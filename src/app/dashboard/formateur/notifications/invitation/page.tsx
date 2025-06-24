@@ -132,7 +132,7 @@ function CsvInterface() {
 }
 
 function LienInterface() {
-  const generatedLink = "https://ton-plateforme.com/invite/abc123";
+  const generatedLink = "http://localhost:3000/invite/abc123";
 
   const copyLink = () => {
     navigator.clipboard.writeText(generatedLink);
