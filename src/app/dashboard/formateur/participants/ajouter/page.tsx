@@ -3,7 +3,6 @@
 import {
   CheckCircleIcon,
   ChevronDownIcon,
-  KeyIcon,
   MailIcon,
   PhoneIcon,
   UserIcon,
@@ -29,6 +28,32 @@ const AddUserForm = () => {
 
   const statusOptions = ["active", "inactive", "suspended"];
 
+  const generatePassword = (length = 12) => {
+    const charset =
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    let password = "";
+
+    const lowercase = "abcdefghijklmnopqrstuvwxyz";
+    const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const numbers = "0123456789";
+    const symbols = "!@#$%^&*";
+
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += symbols[Math.floor(Math.random() * symbols.length)];
+
+    // Fill the rest randomly
+    for (let i = 4; i < length; i++) {
+      password += charset[Math.floor(Math.random() * charset.length)];
+    }
+
+    return password
+      .split("")
+      .sort(() => Math.random() - 0.5)
+      .join("");
+  };
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -39,18 +64,13 @@ const AddUserForm = () => {
     setSuccess("");
   };
 
-  const validatePassword = (password: string | unknown[]) => {
-    return password.length >= 6;
-  };
-
   const handleSubmit = async () => {
     setSubmitLoading(true);
     setError("");
     setSuccess("");
 
     try {
-      // Client-side validation
-      if (!formData.name || !formData.email || !formData.password) {
+      if (!formData.name || !formData.email) {
         throw new Error("Veuillez remplir tous les champs obligatoires");
       }
 
@@ -58,24 +78,23 @@ const AddUserForm = () => {
         throw new Error("Veuillez entrer une adresse email valide");
       }
 
-      if (!validatePassword(formData.password)) {
-        throw new Error("Le mot de passe doit contenir au moins 6 caractères");
-      }
+      const generatedPassword = generatePassword();
 
-      // Prepare data for API call
       const userData = {
         name: formData.name,
         email: formData.email,
-        password: formData.password,
+        password: generatedPassword,
         telephone: formData.telephone || undefined,
         role: formData.role,
         status: formData.status,
         hasCertificate: formData.hasCertificate,
       };
 
-      console.log("Submitting user data:", userData);
+      console.log("Submitting user data:", {
+        ...userData,
+        password: "[GENERATED]",
+      });
 
-      // Call the API
       const response = await fetch("/api/users/add", {
         method: "POST",
         headers: {
@@ -92,13 +111,17 @@ const AddUserForm = () => {
         );
       }
 
-      setSuccess(result.message || "Utilisateur créé avec succès !");
+      setSuccess(
+        `${
+          result.message || "Utilisateur créé avec succès !"
+        } Un mot de passe a été généré automatiquement.`
+      );
 
       setFormData({
         name: "",
         email: "",
-        password: "",
         telephone: "",
+        password: "",
         role: "participant",
         status: "active",
         hasCertificate: false,
@@ -191,29 +214,6 @@ const AddUserForm = () => {
                       placeholder="marie.dubois@example.com"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Mot de passe *
-                  </label>
-                  <div className="relative">
-                    <KeyIcon
-                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                      size={18}
-                    />
-                    <input
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
-                      placeholder="Minimum 6 caractères"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Le mot de passe doit contenir au moins 6 caractères
-                  </p>
                 </div>
 
                 <div>

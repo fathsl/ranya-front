@@ -7,6 +7,7 @@ import {
   Edit3Icon,
   MailIcon,
   PhoneIcon,
+  PlusIcon,
   SaveIcon,
   SearchIcon,
   SquareArrowOutUpRight,
@@ -362,12 +363,12 @@ const ParticipantInterface = () => {
                 Gérez les utilisateurs participants et leurs informations
               </p>
             </div>
-            {/* <Link href={"/dashboard/formateur/participants/ajouter"}>
+            <Link href={"/dashboard/formateur/participants/ajouter"}>
               <button className="flex flex-row bg-blue-600 text-white px-6 py-2 rounded-md space-x-2">
                 <PlusIcon />
                 <span className="text-l font-bold">Ajouter</span>
               </button>
-            </Link> */}
+            </Link>
           </div>
 
           <div className="flex space-x-4 mb-6">

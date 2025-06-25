@@ -19,6 +19,9 @@ import {
   MailIcon,
   CheckIcon,
   ClipboardList,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CalendarIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/authContext";
 import { useRouter } from "next/navigation";
@@ -88,6 +91,8 @@ interface FormData {
   image?: string;
   description: string;
   objectifs: string;
+  startDate: Date;
+  endDate: Date;
   accessType: string;
   userId: string;
   modules: ModuleData[];
@@ -135,6 +140,8 @@ const FormationCreator = ({
     description: "",
     objectifs: "",
     accessType: "public",
+    startDate: new Date(),
+    endDate: new Date(),
     userId: user?.role === "formateur" ? user.id : "",
     modules: [],
     evaluationTest: {
@@ -176,6 +183,12 @@ const FormationCreator = ({
   const [isCreatingInvitation, setIsCreatingInvitation] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null);
   const [isSubmitting] = useState(false);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectingStart, setSelectingStart] = useState(true);
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
   const API_BASE_URL = "http://127.0.0.1:3001";
@@ -474,10 +487,18 @@ const FormationCreator = ({
         description: formationData.description || "",
         objectifs: formationData.objectifs || "",
         accessType: formationData.accessType || "public",
+        startDate: formationData.startDate
+          ? new Date(formationData.startDate)
+          : new Date(),
+        endDate: formationData.endDate
+          ? new Date(formationData.endDate)
+          : new Date(),
         userId: formationData.userId || "",
         modules: modulesWithDetails,
         evaluationTest: evaluationTest,
       });
+
+      console.log("formationData.startDate", formationData.startDate);
 
       setInvitationData(invitationInfo);
       setCurrentFormationId(id);
@@ -1938,66 +1959,107 @@ const FormationCreator = ({
     return undefined;
   };
 
-  // const saveQuizQuestions = async (
-  //   moduleId: string,
-  //   questions:
-  //     | { question: string; options: string[]; correctAnswer: number }[]
-  //     | undefined
-  // ) => {
-  //   try {
-  //     // Use the correct formation ID based on mode
-  //     const formationIdToUse =
-  //       mode === "edit" ? currentFormationId : formationId;
+  const months = [
+    "Janvier",
+    "Février",
+    "Mars",
+    "Avril",
+    "Mai",
+    "Juin",
+    "Juillet",
+    "Août",
+    "Septembre",
+    "Octobre",
+    "Novembre",
+    "Décembre",
+  ];
 
-  //     if (!formationIdToUse) {
-  //       throw new Error("Formation ID is required");
-  //     }
+  const weekDays = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
 
-  //     if (!questions || questions.length === 0) {
-  //       throw new Error("No questions to save");
-  //     }
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
 
-  //     const validQuestions = questions.filter(
-  //       (q) =>
-  //         q.question &&
-  //         q.question.trim() &&
-  //         q.options &&
-  //         q.options.length === 4 &&
-  //         q.options.every((opt: string) => opt.trim()) &&
-  //         typeof q.correctAnswer === "number"
-  //     );
+    const days = [];
 
-  //     if (validQuestions.length === 0) {
-  //       throw new Error(
-  //         "No valid questions found. Please ensure all questions have text, 4 options, and a correct answer selected."
-  //       );
-  //     }
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
 
-  //     const response = await fetch("/api/quiz/add", {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify({
-  //         formationId: formationIdToUse, // Use the correct formation ID
-  //         moduleId: moduleId,
-  //         questions: validQuestions,
-  //       }),
-  //     });
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day));
+    }
 
-  //     if (!response.ok) {
-  //       const errorData = await response.json();
-  //       throw new Error(errorData.message || "Failed to save quiz questions");
-  //     }
+    return days;
+  };
 
-  //     const result = await response.json();
-  //     return result.data;
-  //   } catch (error) {
-  //     throw error instanceof Error
-  //       ? error
-  //       : new Error("An unexpected error occurred while saving quiz questions");
-  //   }
-  // };
+  const formatDate = (date: Date) => {
+    if (!date) return "";
+    return date.toLocaleDateString("fr-FR");
+  };
+
+  const isDateInRange = (date: Date) => {
+    if (!startDate || !endDate || !date) return false;
+    return date > startDate && date < endDate;
+  };
+
+  const isDateSelected = (date: Date) => {
+    if (!date) return false;
+    return (
+      (startDate && date.toDateString() === startDate.toDateString()) ||
+      (endDate && date.toDateString() === endDate.toDateString())
+    );
+  };
+
+  const handleDateClick = (date: Date) => {
+    if (selectingStart || !startDate) {
+      setStartDate(date);
+      setEndDate(null);
+      setSelectingStart(false);
+    } else {
+      if (date < startDate) {
+        setEndDate(startDate);
+        setStartDate(date);
+      } else {
+        setEndDate(date);
+      }
+      setSelectingStart(true);
+    }
+  };
+
+  const navigateMonth = (direction: number) => {
+    setCurrentMonth((prev) => {
+      const newMonth = new Date(prev);
+      newMonth.setMonth(prev.getMonth() + direction);
+      return newMonth;
+    });
+  };
+
+  const clearDates = () => {
+    setStartDate(null);
+    setEndDate(null);
+    setSelectingStart(true);
+  };
+
+  const confirmDates = () => {
+    if (startDate && endDate) {
+      setIsOpen(false);
+    }
+  };
+
+  const getDisplayText = () => {
+    if (startDate && endDate) {
+      return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+    }
+    return "Start Date And End Date *";
+  };
+
+  const today = new Date();
+  const days = getDaysInMonth(currentMonth);
 
   if (loading && mode === "edit") {
     return (
@@ -2105,38 +2167,179 @@ const FormationCreator = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Formateur *
-                </label>
-                {user?.role === "formateur" ? (
-                  <input
-                    type="text"
-                    name="userId"
-                    value={user.name}
-                    readOnly
-                    className={`${inputClass} bg-gray-100 cursor-not-allowed`}
-                    style={{ backgroundColor: "#f9fafb" }}
-                  />
-                ) : (
-                  <select
-                    name="userId"
-                    value={formData.userId || ""}
-                    onChange={handleChange}
-                    className={`${inputClass} cursor-pointer`}
-                  >
-                    <option value="" disabled>
-                      Select a formateur
-                    </option>
-                    {formateurs
-                      .filter((formateur) => formateur.role === "formateur")
-                      .map((formateur) => (
-                        <option key={formateur.id} value={formateur.id}>
-                          {formateur.name}
-                        </option>
-                      ))}
-                  </select>
-                )}
+              <div className="flex flex-row items-center justify-between">
+                <div className="w-full">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Formateur *
+                  </label>
+                  {user?.role === "formateur" ? (
+                    <input
+                      type="text"
+                      name="userId"
+                      value={user.name}
+                      readOnly
+                      className={`${inputClass} bg-gray-100 cursor-not-allowed`}
+                      style={{ backgroundColor: "#f9fafb" }}
+                    />
+                  ) : (
+                    <select
+                      name="userId"
+                      value={formData.userId || ""}
+                      onChange={handleChange}
+                      className={`${inputClass} cursor-pointer`}
+                    >
+                      <option value="" disabled>
+                        Select a formateur
+                      </option>
+                      {formateurs
+                        .filter((formateur) => formateur.role === "formateur")
+                        .map((formateur) => (
+                          <option key={formateur.id} value={formateur.id}>
+                            {formateur.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </div>
+                <div className="w-full">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2"></label>
+                  <div className="relative max-w-sm mx-auto">
+                    <button
+                      onClick={() => setIsOpen(!isOpen)}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <span className="flex items-center">
+                        <CalendarIcon className="w-5 h-5 text-gray-400 mr-3" />
+                        <span
+                          className={
+                            startDate && endDate
+                              ? "text-gray-900"
+                              : "text-gray-500"
+                          }
+                        >
+                          {getDisplayText()}
+                        </span>
+                      </span>
+                    </button>
+
+                    {isOpen && (
+                      <div className="absolute top-full left-0 z-50 mt-2 p-4 bg-white border border-gray-200 rounded-lg shadow-lg min-w-80">
+                        <div className="flex items-center justify-between mb-4">
+                          <button
+                            onClick={() => navigateMonth(-1)}
+                            className="p-2 hover:bg-gray-100 rounded-full"
+                          >
+                            <ChevronLeftIcon className="w-4 h-4" />
+                          </button>
+
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {months[currentMonth.getMonth()]}{" "}
+                            {currentMonth.getFullYear()}
+                          </h3>
+
+                          <button
+                            onClick={() => navigateMonth(1)}
+                            className="p-2 hover:bg-gray-100 rounded-full"
+                          >
+                            <ChevronRightIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-7 gap-1 mb-2">
+                          {weekDays.map((day) => (
+                            <div
+                              key={day}
+                              className="p-2 text-center text-sm font-medium text-gray-500"
+                            >
+                              {day}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-7 gap-1 mb-4">
+                          {days.map((date, index) => {
+                            if (!date) {
+                              return <div key={index} className="p-2"></div>;
+                            }
+
+                            const isSelected = isDateSelected(date);
+                            const isInRange = isDateInRange(date);
+                            const isToday =
+                              date.toDateString() === today.toDateString();
+                            const isStartDate =
+                              startDate &&
+                              date.toDateString() === startDate.toDateString();
+                            const isEndDate =
+                              endDate &&
+                              date.toDateString() === endDate.toDateString();
+
+                            let cellClasses =
+                              "w-10 h-10 flex items-center justify-center text-sm rounded-lg cursor-pointer transition-colors ";
+
+                            if (isStartDate || isEndDate) {
+                              cellClasses +=
+                                "bg-blue-600 text-white font-semibold ";
+                            } else if (isInRange) {
+                              cellClasses += "bg-blue-100 text-blue-800 ";
+                            } else {
+                              cellClasses += "text-gray-700 hover:bg-gray-100 ";
+                            }
+
+                            if (isToday && !isSelected) {
+                              cellClasses += "ring-2 ring-blue-300 ";
+                            }
+
+                            return (
+                              <button
+                                key={index}
+                                onClick={() => handleDateClick(date)}
+                                className={cellClasses}
+                              >
+                                {date.getDate()}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+                          <button
+                            onClick={clearDates}
+                            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                          >
+                            Effacer
+                          </button>
+
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => setIsOpen(false)}
+                              className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                            >
+                              Annuler
+                            </button>
+                            <button
+                              onClick={confirmDates}
+                              disabled={!startDate || !endDate}
+                              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            >
+                              Confirmer
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {startDate && endDate && (
+                      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="text-sm text-green-800">
+                          <strong>Période sélectionnée:</strong>
+                        </div>
+                        <div className="text-sm text-green-700 mt-1">
+                          Du {formatDate(startDate)} au {formatDate(endDate)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">

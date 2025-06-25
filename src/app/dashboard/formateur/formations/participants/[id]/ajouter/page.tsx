@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import {
   CheckCircleIcon,
   ChevronDownIcon,
-  KeyIcon,
   MailIcon,
   PhoneIcon,
   UserIcon,
@@ -32,6 +31,32 @@ const AddUserForm = () => {
 
   const statusOptions = ["active", "inactive", "suspended"];
 
+  const generatePassword = (length = 12) => {
+    const charset =
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    let password = "";
+
+    const lowercase = "abcdefghijklmnopqrstuvwxyz";
+    const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const numbers = "0123456789";
+    const symbols = "!@#$%^&*";
+
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += symbols[Math.floor(Math.random() * symbols.length)];
+
+    // Fill the rest randomly
+    for (let i = 4; i < length; i++) {
+      password += charset[Math.floor(Math.random() * charset.length)];
+    }
+
+    return password
+      .split("")
+      .sort(() => Math.random() - 0.5)
+      .join("");
+  };
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -40,10 +65,6 @@ const AddUserForm = () => {
     }));
     setError("");
     setSuccess("");
-  };
-
-  const validatePassword = (password: string | unknown[]) => {
-    return password.length >= 6;
   };
 
   const hashPassword = async (password: string) => {
@@ -106,8 +127,7 @@ const AddUserForm = () => {
     setSuccess("");
 
     try {
-      // Validation
-      if (!formData.name || !formData.email || !formData.password) {
+      if (!formData.name || !formData.email) {
         throw new Error("Veuillez remplir tous les champs obligatoires");
       }
 
@@ -115,17 +135,13 @@ const AddUserForm = () => {
         throw new Error("Veuillez entrer une adresse email valide");
       }
 
-      if (!validatePassword(formData.password)) {
-        throw new Error("Le mot de passe doit contenir au moins 6 caractères");
-      }
-
       if (!id) {
         throw new Error("ID de formation manquant");
       }
 
-      // Store the plain password before hashing
-      const plainPassword = formData.password;
-      const hashedPassword = await hashPassword(formData.password);
+      const generatedPassword = generatePassword();
+
+      const hashedPassword = await hashPassword(generatedPassword);
 
       const userData = {
         name: formData.name,
@@ -138,12 +154,6 @@ const AddUserForm = () => {
         formationId: id,
       };
 
-      console.log("Submitting user data:", {
-        ...userData,
-        password: "[HASHED]",
-      });
-
-      // Create the user
       const response = await fetch("/api/users/addUserWithFormation", {
         method: "POST",
         headers: {
@@ -166,14 +176,14 @@ const AddUserForm = () => {
         await sendWelcomeEmail(
           formData.email,
           formData.name,
-          plainPassword,
+          generatedPassword,
           formationName
         );
 
         setSuccess(
           `${
             result.message || "Participant ajouté avec succès à la formation !"
-          } Un email de bienvenue a été envoyé.`
+          } Un email de bienvenue avec le mot de passe a été envoyé.`
         );
       } catch (emailError) {
         console.error("Email sending failed:", emailError);
@@ -187,8 +197,8 @@ const AddUserForm = () => {
       setFormData({
         name: "",
         email: "",
-        password: "",
         telephone: "",
+        password: "",
         role: "participant",
         status: "active",
         hasCertificate: false,
@@ -282,29 +292,6 @@ const AddUserForm = () => {
                       placeholder="marie.dubois@example.com"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Mot de passe *
-                  </label>
-                  <div className="relative">
-                    <KeyIcon
-                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                      size={18}
-                    />
-                    <input
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
-                      placeholder="Minimum 6 caractères"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Le mot de passe doit contenir au moins 6 caractères
-                  </p>
                 </div>
 
                 <div>
