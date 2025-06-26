@@ -73,8 +73,9 @@ export default function LoginPage() {
             confirmPassword: "",
           });
           setShowUpdateProfileDialog(true);
-
-          // router.push("/dashboard/participant/dashboard");
+          // router.push("/dashboard/participant/dashboard"); // Optional
+        } else if (data.user.role === "admin") {
+          router.push("/dashboard/admin/dashboard");
         } else {
           router.push("/dashboard/formateur/dashboard");
         }

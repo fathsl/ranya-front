@@ -1,5 +1,6 @@
 "use client";
 
+import EvaluationTestsDrawer from "@/components/EvaluationTestsDrawer";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -7,19 +8,15 @@ import {
   ClipboardCheckIcon,
   ClockIcon,
   Edit3Icon,
-  EditIcon,
   FolderIcon,
   GraduationCapIcon,
   HelpCircleIcon,
   LayersIcon,
-  ListIcon,
   PlayIcon,
-  PlusIcon,
   SearchIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
-import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 
 interface ResourceEntity {
@@ -95,6 +92,7 @@ export interface Question {
 }
 
 export interface EvaluationTest {
+  id: string;
   isEnabled: boolean;
   title: string;
   timeLimit: number;
@@ -135,8 +133,6 @@ const ResourcesInterface = () => {
   >({});
   const [, setLoadingQuizzes] = useState<Record<string, boolean>>({});
   const [evaluationTests, setEvaluationTests] = useState<EvaluationTest[]>([]);
-  const [editTestDrawerOpen, setEditTestDrawerOpen] = useState(false);
-  const [addQuestionDrawerOpen, setAddQuestionDrawerOpen] = useState(false);
 
   const [editData, setEditData] = useState<EditResourceData>({
     title: "",
@@ -154,22 +150,17 @@ const ResourcesInterface = () => {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [loading] = useState(true);
-  const [questionsDrawerOpen, setQuestionsDrawerOpen] = useState(false);
-  const [selectedFormationQuestions, setSelectedFormationQuestions] = useState<
-    Question[]
-  >([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
     null
   );
   const [isQuizDrawerOpen, setIsQuizDrawerOpen] = useState(false);
+  const [evaluationTestsDrawerOpen, setEvaluationTestsDrawerOpen] =
+    useState(false);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [isEditingQuiz, setIsEditingQuiz] = useState(false);
   const [isPlayingQuiz, setIsPlayingQuiz] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<number[]>([]);
-  const [selectedTest, setSelectedTest] = useState<EvaluationTest | null>(null);
-  const [selectedFormationId, setSelectedFormationId] = useState<string>("");
-  const [testDrawerOpen, setTestDrawerOpen] = useState(false);
   const [quizResults, setQuizResults] = useState<{
     score: number;
     total: number;
@@ -300,12 +291,107 @@ const ResourcesInterface = () => {
     await Promise.all(moduleIds.map((moduleId) => fetchQuizzes(moduleId)));
   };
 
+  const fetchEvaluationTests = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:3001/evaluation-tests", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setEvaluationTests(data);
+      }
+    } catch (error) {
+      console.error("Error fetching evaluation tests:", error);
+    }
+  };
+
+  const updateEvaluationTest = async (
+    testId: string,
+    updatedTest: Partial<EvaluationTest>
+  ) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:3001/evaluation-tests/${testId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedTest),
+        }
+      );
+
+      if (response.ok) {
+        const updatedTestData = await response.json();
+        setEvaluationTests((prev) =>
+          prev.map((test) =>
+            test.id === testId ? { ...test, ...updatedTestData } : test
+          )
+        );
+      } else {
+        throw new Error("Failed to update evaluation test");
+      }
+    } catch (error) {
+      console.error("Error updating evaluation test:", error);
+      throw error;
+    }
+  };
+
+  const deleteEvaluationTest = async (testId: string) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:3001/evaluation-tests/${testId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.ok) {
+        setEvaluationTests((prev) => prev.filter((test) => test.id !== testId));
+      } else {
+        throw new Error("Failed to delete evaluation test");
+      }
+    } catch (error) {
+      console.error("Error deleting evaluation test:", error);
+      throw error;
+    }
+  };
+
+  const createEvaluationTest = async (newTest: Omit<EvaluationTest, "id">) => {
+    try {
+      const response = await fetch("http://127.0.0.1:3001/evaluation-tests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newTest),
+      });
+
+      if (response.ok) {
+        const createdTest = await response.json();
+        setEvaluationTests((prev) => [...prev, createdTest]);
+      } else {
+        throw new Error("Failed to create evaluation test");
+      }
+    } catch (error) {
+      console.error("Error creating evaluation test:", error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     const initializeData = async () => {
       await fetchFormations();
       await fetchModules();
       await fetchResources();
       await fetchQuestions();
+      await fetchEvaluationTests();
     };
 
     initializeData();
@@ -501,32 +587,6 @@ const ResourcesInterface = () => {
     );
   };
 
-  const addQuestionToFormation = async (
-    formationId: string,
-    newQuestion: Omit<Question, "id">
-  ) => {
-    try {
-      const response = await fetch("http://127.0.0.1:3001/questions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...newQuestion,
-          formationId: formationId,
-        }),
-      });
-
-      if (response.ok) {
-        const createdQuestion = await response.json();
-        setQuestions((prev) => [...prev, createdQuestion]);
-        return createdQuestion;
-      }
-    } catch (error) {
-      console.error("Error adding question:", error);
-    }
-  };
-
   const createEvaluationTestWithQuestions = (
     formationId: string
   ): EvaluationTest | null => {
@@ -552,13 +612,6 @@ const ResourcesInterface = () => {
     }
 
     return null;
-  };
-
-  const openQuestionsDrawer = (formationId: string) => {
-    const formationQuestions = getFormationQuestions(formationId);
-    setSelectedFormationQuestions(formationQuestions);
-    setSelectedFormationId(formationId);
-    setQuestionsDrawerOpen(true);
   };
 
   const handleQuizEdit = (quiz: Quiz) => {
@@ -785,7 +838,15 @@ const ResourcesInterface = () => {
     ? getFormationByModuleId(editData.moduleId)
     : null;
 
-  const evaluationTest = createEvaluationTestWithQuestions(selectedFormationId);
+  const EvaluationTestsButton = () => (
+    <button
+      onClick={() => setEvaluationTestsDrawerOpen(true)}
+      className="px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all duration-300 flex items-center gap-2"
+    >
+      <ClipboardCheckIcon size={16} />
+      Tests d&apos;évaluation
+    </button>
+  );
 
   if (loading && formations.length === 0) {
     return (
@@ -811,12 +872,17 @@ const ResourcesInterface = () => {
                 Gérez les ressources pédagogiques par formation et module
               </p>
             </div>
-            <Link href={"/dashboard/formateur/ressources/ajouter"}>
-              <button className="flex flex-row bg-blue-600 text-white px-6 py-2 rounded-md space-x-2">
-                <PlusIcon />
-                <span className="text-l font-bold">Ajouter</span>
-              </button>
-            </Link>
+            <div className="flex flex-row items-start space-x-2">
+              <div>
+                <EvaluationTestsButton />
+              </div>
+              {/* <Link href={"/dashboard/formateur/ressources/ajouter"}>
+                <button className="flex flex-row bg-blue-600 text-white px-6 py-2 rounded-md space-x-2">
+                  <PlusIcon />
+                  <span className="text-l font-bold">Ajouter</span>
+                </button>
+              </Link> */}
+            </div>
           </div>
 
           <div className="relative mb-6">
@@ -949,126 +1015,6 @@ const ResourcesInterface = () => {
                           </div>
                         </td>
                       </tr>
-
-                      {isExpanded && (
-                        <tr className="bg-gradient-to-r from-orange-50/50 to-red-50/50 hover:from-orange-100/50 hover:to-red-100/50 transition-all duration-300">
-                          <td className="py-3 px-6 pl-12">
-                            <div className="w-4 h-4 border-l-2 border-b-2 border-orange-300"></div>
-                          </td>
-                          <td className="py-3 px-6">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-400 rounded-lg flex items-center justify-center text-white">
-                                <ClipboardCheckIcon size={16} />
-                              </div>
-                              <div>
-                                <div className="font-semibold text-gray-800">
-                                  {evaluationTest?.title || "Test d'évaluation"}
-                                </div>
-                                <div className="text-sm text-gray-500 mt-1">
-                                  {evaluationTest ? (
-                                    <>
-                                      {evaluationTest.questions.length} question
-                                      {evaluationTest.questions.length > 1
-                                        ? "s"
-                                        : ""}{" "}
-                                      •{evaluationTest.timeLimit}min •
-                                      {evaluationTest.passingScore}% requis
-                                    </>
-                                  ) : (
-                                    "Aucun test configuré"
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-6">
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                evaluationTest?.isEnabled
-                                  ? "bg-gradient-to-r from-green-100 to-emerald-100 text-green-800"
-                                  : "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600"
-                              }`}
-                            >
-                              {evaluationTest?.isEnabled ? "ACTIF" : "INACTIF"}
-                            </span>
-                          </td>
-                          <td className="py-3 px-6">
-                            <div className="text-sm text-gray-600">
-                              {evaluationTest?.questions.length || 0} question
-                              {(evaluationTest?.questions.length || 0) > 1
-                                ? "s"
-                                : ""}
-                            </div>
-                          </td>
-                          <td className="py-3 px-6">
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <ClockIcon size={14} />
-                              <span className="text-sm">
-                                {evaluationTest?.timeLimit
-                                  ? `${evaluationTest.timeLimit}min`
-                                  : "--"}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-6">
-                            <div className="text-sm text-gray-600">
-                              {evaluationTest?.passingScore
-                                ? `${evaluationTest.passingScore}%`
-                                : "--"}
-                            </div>
-                          </td>
-                          <td className="py-3 px-6">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() =>
-                                  openQuestionsDrawer(formation.id)
-                                }
-                                className="p-1 hover:bg-white/50 rounded transition-colors text-purple-600 hover:text-purple-700"
-                                title="Voir les questions"
-                              >
-                                <ListIcon size={16} />
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setSelectedFormationId(formation.id);
-                                  setAddQuestionDrawerOpen(true);
-                                }}
-                                className="p-1 hover:bg-white/50 rounded transition-colors text-indigo-600 hover:text-indigo-700"
-                                title="Ajouter une question"
-                              >
-                                <PlusIcon size={16} />
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setSelectedTest(evaluationTest);
-                                  setSelectedFormationId(formation.id);
-                                  setEditTestDrawerOpen(true);
-                                }}
-                                className="p-1 hover:bg-white/50 rounded transition-colors text-blue-600 hover:text-blue-700"
-                                title="Modifier le test"
-                              >
-                                <EditIcon size={16} />
-                              </button>
-
-                              {evaluationTest &&
-                                evaluationTest.questions.length > 0 && (
-                                  <button
-                                    onClick={() => {
-                                      setSelectedTest(evaluationTest);
-                                      setTestDrawerOpen(true);
-                                    }}
-                                    className="p-1 hover:bg-white/50 rounded transition-colors text-green-600 hover:text-green-700"
-                                    title="Passer le test"
-                                  >
-                                    <PlayIcon size={16} />
-                                  </button>
-                                )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
 
                       {/* Module and Resource Rows */}
                       {isExpanded &&
@@ -1364,6 +1310,16 @@ const ResourcesInterface = () => {
           )}
         </div>
       </div>
+
+      <EvaluationTestsDrawer
+        isOpen={evaluationTestsDrawerOpen}
+        onClose={() => setEvaluationTestsDrawerOpen(false)}
+        evaluationTests={evaluationTests}
+        formations={formations}
+        onUpdateTest={updateEvaluationTest}
+        onDeleteTest={deleteEvaluationTest}
+        onCreateTest={createEvaluationTest}
+      />
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">

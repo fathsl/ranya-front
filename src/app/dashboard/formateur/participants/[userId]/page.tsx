@@ -5,6 +5,7 @@ import {
   ActivityIcon,
   AlertCircleIcon,
   AwardIcon,
+  BellIcon,
   BookOpenIcon,
   CalendarIcon,
   CheckCircleIcon,
@@ -267,6 +268,35 @@ const ParticipantDashboard = () => {
     );
   };
 
+  const handleSendReminder = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("http://127.0.0.1:3001/notifications/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: "⏰ Rappel : votre formation commence bientôt",
+          body: `N’oubliez pas de la rejoindre la formation à l’heure prévue.
+                  Cliquez ici pour accéder à la session.`,
+          type: "formation_reminder",
+          userIds: [userId],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de l'envoi de la notification");
+      }
+    } catch (err) {
+      setError(err.message || "Une erreur est survenue");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
@@ -317,6 +347,15 @@ const ParticipantDashboard = () => {
                 {getStatusIcon(user.status)}
                 <span className="ml-1 capitalize">{user.status}</span>
               </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={handleSendReminder}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"
+              >
+                <BellIcon size={18} />
+                Envoyer un rappel
+              </button>
             </div>
           </div>
         </div>

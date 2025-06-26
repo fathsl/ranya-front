@@ -102,6 +102,10 @@ interface FormData {
 interface FormationCreatorProps {
   mode?: "create" | "edit";
   formationIdEdit?: string;
+  initialStartDate: Date | null;
+  initialEndDate: Date | null;
+  onDateChange?: (startDate: Date | null, endDate: Date | null) => void;
+  disabled?: boolean;
 }
 
 const StepWrapper = ({
@@ -125,11 +129,17 @@ const StepWrapper = ({
 const FormationCreator = ({
   mode = "create",
   formationIdEdit,
+  initialStartDate = null,
+  initialEndDate = null,
+  onDateChange = () => {},
+  disabled = false,
 }: FormationCreatorProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formateurs, setFormateurs] = useState<User[]>([]);
   const { user } = useAuth();
   const [formationId, setFormationId] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date | null>(initialStartDate);
+  const [endDate, setEndDate] = useState<Date | null>(initialEndDate);
   const [currentFormationId, setCurrentFormationId] = useState<string>(
     mode === "edit" ? formationIdEdit || "" : ""
   );
@@ -140,8 +150,8 @@ const FormationCreator = ({
     description: "",
     objectifs: "",
     accessType: "public",
-    startDate: mode === "edit" ? new Date() : (null as any),
-    endDate: mode === "edit" ? new Date() : (null as any),
+    startDate: null,
+    endDate: null,
     userId: user?.role === "formateur" ? user.id : "",
     modules: [],
     evaluationTest: {
@@ -184,8 +194,6 @@ const FormationCreator = ({
   const [isCreatingInvitation, setIsCreatingInvitation] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null);
   const [isSubmitting] = useState(false);
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isOpen, setIsOpen] = useState(false);
   const [selectingStart, setSelectingStart] = useState(true);
@@ -438,7 +446,6 @@ const FormationCreator = ({
         }
       });
 
-      // Debug: Log final modules with
       console.log("Modules with details:", modulesWithDetails);
 
       const invitationsResponse = await fetch(
@@ -500,13 +507,8 @@ const FormationCreator = ({
         }
       }
 
-      if (!validStartDate) {
-        validStartDate = new Date();
-      }
-      if (!validEndDate) {
-        validEndDate = new Date();
-      }
-
+      setStartDate(validStartDate);
+      setEndDate(validEndDate);
       setFormData({
         titre: formationData.titre || "",
         domaine: formationData.domaine || "",
@@ -544,11 +546,18 @@ const FormationCreator = ({
   }, [mode, formationIdEdit]);
 
   useEffect(() => {
-    if (mode === "edit" && formData.startDate && formData.endDate) {
-      setStartDate(formData.startDate);
-      setEndDate(formData.endDate);
+    if (startDate && endDate) {
+      onDateChange(startDate, endDate);
     }
-  }, [formData.startDate, formData.endDate, mode]);
+  }, [startDate, endDate, onDateChange]);
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      startDate: startDate,
+      endDate: endDate,
+    }));
+  }, [startDate, endDate]);
 
   useEffect(() => {
     if (user?.role === "formateur" && user?.id) {
@@ -2042,7 +2051,7 @@ const FormationCreator = ({
     return days;
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | null) => {
     if (!date) return "";
     return date.toLocaleDateString("fr-FR");
   };
@@ -2061,18 +2070,16 @@ const FormationCreator = ({
   };
 
   const handleDateClick = (date: Date) => {
-    if (selectingStart || !startDate) {
-      setStartDate(date);
+    if (!startDate || (startDate && endDate)) {
+      setStartDate(new Date(date));
       setEndDate(null);
-      setSelectingStart(false);
-    } else {
+    } else if (startDate && !endDate) {
       if (date < startDate) {
-        setEndDate(startDate);
-        setStartDate(date);
+        setEndDate(new Date(startDate));
+        setStartDate(new Date(date));
       } else {
-        setEndDate(date);
+        setEndDate(new Date(date));
       }
-      setSelectingStart(true);
     }
   };
 
@@ -2092,11 +2099,6 @@ const FormationCreator = ({
 
   const confirmDates = () => {
     if (startDate && endDate) {
-      setFormData((prev) => ({
-        ...prev,
-        startDate: startDate,
-        endDate: endDate,
-      }));
       setIsOpen(false);
     }
   };
@@ -2252,11 +2254,16 @@ const FormationCreator = ({
                   )}
                 </div>
                 <div className="w-full">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2"></label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Sélectionner les dates
+                  </label>
                   <div className="relative max-w-sm mx-auto">
                     <button
-                      onClick={() => setIsOpen(!isOpen)}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      onClick={() => !disabled && setIsOpen(!isOpen)}
+                      disabled={disabled}
+                      className={`w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        disabled ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                     >
                       <span className="flex items-center">
                         <CalendarIcon className="w-5 h-5 text-gray-400 mr-3" />

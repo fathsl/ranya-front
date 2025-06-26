@@ -41,6 +41,8 @@ export interface Formation {
   image?: string;
   description: string;
   objectifs: string;
+  startDate: Date | null;
+  endDate: Date | null;
   accessType: "public" | "private";
   archived: boolean;
   invitation: {
@@ -129,7 +131,6 @@ const FormationCalendar = () => {
     setFilteredFormations(filtered);
   }, [searchTerm, formations]);
 
-  // Get calendar data
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const firstDay = new Date(year, month, 1);
@@ -162,18 +163,69 @@ const FormationCalendar = () => {
     "Décembre",
   ];
 
+  const isDateInFormationRange = (date: Date, formation: Formation) => {
+    if (!formation.startDate || !formation.endDate) return false;
+
+    const formationStart = new Date(formation.startDate);
+    const formationEnd = new Date(formation.endDate);
+
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+    formationStart.setHours(0, 0, 0, 0);
+    formationEnd.setHours(0, 0, 0, 0);
+
+    return checkDate >= formationStart && checkDate <= formationEnd;
+  };
+
+  const getFormationPositionInfo = (date: Date, formation: Formation) => {
+    if (!formation.startDate || !formation.endDate) return null;
+
+    const formationStart = new Date(formation.startDate);
+    const formationEnd = new Date(formation.endDate);
+    const checkDate = new Date(date);
+
+    checkDate.setHours(0, 0, 0, 0);
+    formationStart.setHours(0, 0, 0, 0);
+    formationEnd.setHours(0, 0, 0, 0);
+
+    const isStart = checkDate.getTime() === formationStart.getTime();
+    const isEnd = checkDate.getTime() === formationEnd.getTime();
+    const isSingle = formationStart.getTime() === formationEnd.getTime();
+
+    return {
+      isStart,
+      isEnd,
+      isSingle,
+      isMiddle: !isStart && !isEnd && !isSingle,
+    };
+  };
+
   const getFormationsForDate = (date: Date) => {
     return filteredFormations.filter((formation) => {
-      if (!formation.createdAt) return false;
-
-      const formationDate = new Date(formation.createdAt);
-      return formationDate.toDateString() === date.toDateString();
+      return isDateInFormationRange(date, formation);
     });
   };
 
-  const formatDuration = (modules: ModuleEntity[]) => {
-    if (!modules || modules.length === 0) return "Non spécifié";
-    return `${modules.length} module(s)`;
+  const getFormationDuration = (formation: Formation) => {
+    if (!formation.startDate || !formation.endDate) return "Non spécifié";
+
+    const start = new Date(formation.startDate);
+    const end = new Date(formation.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    return `${diffDays} jour${diffDays > 1 ? "s" : ""}`;
+  };
+
+  const formatDuration = (formation: Formation) => {
+    const duration = getFormationDuration(formation);
+    const moduleCount = formation.modules?.length || 0;
+
+    if (moduleCount > 0) {
+      return `${duration} • ${moduleCount} module${moduleCount > 1 ? "s" : ""}`;
+    }
+
+    return duration;
   };
 
   const navigateMonth = (direction: number) => {
@@ -320,22 +372,69 @@ const FormationCalendar = () => {
                     {day.getDate()}
                   </div>
                   <div className="space-y-1">
-                    {dayFormations.map((formation) => (
-                      <div
-                        key={formation.id}
-                        onClick={() => openModal(formation)}
-                        className="text-xs p-2 bg-blue-100 text-blue-800 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate"
-                        title={formation.titre}
-                      >
-                        <div className="font-medium truncate">
-                          {formation.titre}
+                    {dayFormations.map((formation) => {
+                      const positionInfo = getFormationPositionInfo(
+                        day,
+                        formation
+                      );
+
+                      if (!positionInfo) return null;
+
+                      let styleClasses =
+                        "text-xs p-2 rounded cursor-pointer hover:opacity-80 transition-all truncate ";
+                      let borderRadius = "";
+
+                      if (positionInfo.isSingle) {
+                        styleClasses +=
+                          "bg-blue-100 text-blue-800 border-2 border-blue-300";
+                        borderRadius = "rounded";
+                      } else if (positionInfo.isStart) {
+                        styleClasses +=
+                          "bg-blue-100 text-blue-800 border-2 border-blue-300 border-r-blue-200";
+                        borderRadius = "rounded-l";
+                      } else if (positionInfo.isEnd) {
+                        styleClasses +=
+                          "bg-blue-100 text-blue-800 border-2 border-blue-300 border-l-blue-200";
+                        borderRadius = "rounded-r";
+                      } else {
+                        styleClasses +=
+                          "bg-blue-50 text-blue-700 border-t-2 border-b-2 border-blue-200";
+                        borderRadius = "rounded-none";
+                      }
+
+                      return (
+                        <div
+                          key={formation.id}
+                          onClick={() => openModal(formation)}
+                          className={`${styleClasses} ${borderRadius}`}
+                          title={`${formation.titre} - ${formatDuration(
+                            formation
+                          )}`}
+                        >
+                          <div className="font-medium truncate">
+                            {positionInfo.isStart || positionInfo.isSingle ? (
+                              <>
+                                {formation.titre}
+                                {positionInfo.isSingle && (
+                                  <div className="text-blue-600 flex items-center gap-1 mt-1">
+                                    <ClockIcon size={10} />
+                                    {formatDuration(formation)}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="text-center">•••</div>
+                            )}
+                          </div>
+                          {positionInfo.isStart && !positionInfo.isSingle && (
+                            <div className="text-blue-600 flex items-center gap-1 mt-1">
+                              <ClockIcon size={10} />
+                              {formatDuration(formation)}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-blue-600 flex items-center gap-1">
-                          <ClockIcon size={10} />
-                          {formatDuration(formation.modules)}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -355,9 +454,9 @@ const FormationCalendar = () => {
                     <div className="flex items-center gap-4 text-blue-100">
                       <div className="flex items-center gap-1">
                         <CalendarIcon size={16} />
-                        {selectedFormation.createdAt
+                        {selectedFormation.startDate
                           ? new Date(
-                              selectedFormation.createdAt
+                              selectedFormation.startDate
                             ).toLocaleDateString("fr-FR")
                           : "Date non définie"}
                       </div>

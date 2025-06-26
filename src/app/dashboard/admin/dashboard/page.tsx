@@ -1,12 +1,12 @@
 "use client";
 
-import { useAuth } from "@/contexts/authContext";
 import {
   calculateDashboardData,
   calculateMonthlyFormationsData,
   calculateUserFormationStats,
   DashboardData,
   DOMAIN_COLORS,
+  fetchFormations,
   Formation,
   MonthlyData,
   TopUser,
@@ -41,7 +41,6 @@ const Dashboard = () => {
   const [formations, setFormations] = useState<Formation[]>([]);
   const { certificates } = useCertificates();
   const { invitations } = useInvitations();
-  const { user } = useAuth();
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [userStats, setUserStats] = useState<UserStats>({
     uniqueUsers: 0,
@@ -58,42 +57,12 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUserFormations = async (): Promise<Formation[]> => {
-      if (!user?.id) {
-        throw new Error("User ID not available");
-      }
-
-      try {
-        const response = await fetch("http://127.0.0.1:3001/formations", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const allFormations = await response.json();
-
-        const userFormations = allFormations.filter(
-          (formation: Formation) => formation.userId === user.id
-        );
-
-        return userFormations;
-      } catch (error) {
-        console.error("Error fetching user formations:", error);
-        throw error;
-      }
-    };
-
     const loadFormations = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const formationsData = await fetchUserFormations();
+        const formationsData = await fetchFormations();
         setFormations(formationsData);
 
         const monthlyChartData = calculateMonthlyFormationsData(formationsData);
@@ -106,15 +75,28 @@ const Dashboard = () => {
         setDashboardData(calculatedDashboardData);
       } catch (error: any) {
         setError(error.message || "Unknown error");
+        console.error("Error loading data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (user?.id) {
-      loadFormations();
+    loadFormations();
+  }, []);
+
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchFormations();
+      setFormations(data);
+      const calculatedDashboardData = calculateDashboardData(data);
+      setDashboardData(calculatedDashboardData);
+    } catch (error: any) {
+      setError(error.message || "Unknown error");
+    } finally {
+      setLoading(false);
     }
-  }, [user?.id]);
+  };
 
   const preparePieChartData = () => {
     if (!dashboardData) return [];
@@ -164,6 +146,12 @@ const Dashboard = () => {
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
         <strong className="font-bold">Error: </strong>
         <span className="block sm:inline">{error}</span>
+        <button
+          onClick={refreshData}
+          className="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Retry
+        </button>
       </div>
     );
   }
