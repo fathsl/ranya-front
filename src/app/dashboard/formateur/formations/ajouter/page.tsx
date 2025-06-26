@@ -91,8 +91,8 @@ interface FormData {
   image?: string;
   description: string;
   objectifs: string;
-  startDate: Date;
-  endDate: Date;
+  startDate: Date | null;
+  endDate: Date | null;
   accessType: string;
   userId: string;
   modules: ModuleData[];
@@ -140,8 +140,8 @@ const FormationCreator = ({
     description: "",
     objectifs: "",
     accessType: "public",
-    startDate: new Date(),
-    endDate: new Date(),
+    startDate: mode === "edit" ? new Date() : (null as any),
+    endDate: mode === "edit" ? new Date() : (null as any),
     userId: user?.role === "formateur" ? user.id : "",
     modules: [],
     evaluationTest: {
@@ -160,6 +160,7 @@ const FormationCreator = ({
     invitationLink: "",
     linkGenerated: false,
     csvFile: null as File | null,
+    expiresAt: 0,
   });
 
   const [currentQuestion, setCurrentQuestion] = useState<Partial<Question>>({
@@ -456,6 +457,7 @@ const FormationCreator = ({
         invitationLink: "",
         linkGenerated: false,
         csvFile: null as File | null,
+        expiresAt: 0,
       };
 
       if (invitationsResponse.ok) {
@@ -475,9 +477,34 @@ const FormationCreator = ({
             emails: invitation.emails || [""],
             invitationLink: invitation.invitationLink || "",
             linkGenerated: !!invitation.invitationLink,
+            expiresAt: invitation.expiresAt || 0,
             csvFile: null,
           };
         }
+      }
+
+      let validStartDate = null;
+      let validEndDate = null;
+
+      if (formationData.startDate) {
+        const parsedStartDate = new Date(formationData.startDate);
+        if (!isNaN(parsedStartDate.getTime())) {
+          validStartDate = parsedStartDate;
+        }
+      }
+
+      if (formationData.endDate) {
+        const parsedEndDate = new Date(formationData.endDate);
+        if (!isNaN(parsedEndDate.getTime())) {
+          validEndDate = parsedEndDate;
+        }
+      }
+
+      if (!validStartDate) {
+        validStartDate = new Date();
+      }
+      if (!validEndDate) {
+        validEndDate = new Date();
       }
 
       setFormData({
@@ -487,12 +514,8 @@ const FormationCreator = ({
         description: formationData.description || "",
         objectifs: formationData.objectifs || "",
         accessType: formationData.accessType || "public",
-        startDate: formationData.startDate
-          ? new Date(formationData.startDate)
-          : new Date(),
-        endDate: formationData.endDate
-          ? new Date(formationData.endDate)
-          : new Date(),
+        startDate: validStartDate,
+        endDate: validEndDate,
         userId: formationData.userId || "",
         modules: modulesWithDetails,
         evaluationTest: evaluationTest,
@@ -502,6 +525,8 @@ const FormationCreator = ({
 
       setInvitationData(invitationInfo);
       setCurrentFormationId(id);
+      setStartDate(validStartDate);
+      setEndDate(validEndDate);
     } catch (error) {
       console.error("Error fetching formation data:", error);
       setError(
@@ -517,6 +542,13 @@ const FormationCreator = ({
       fetchFormationData(formationIdEdit);
     }
   }, [mode, formationIdEdit]);
+
+  useEffect(() => {
+    if (mode === "edit" && formData.startDate && formData.endDate) {
+      setStartDate(formData.startDate);
+      setEndDate(formData.endDate);
+    }
+  }, [formData.startDate, formData.endDate, mode]);
 
   useEffect(() => {
     if (user?.role === "formateur" && user?.id) {
@@ -1746,14 +1778,15 @@ const FormationCreator = ({
   const sendEmailInvitations = async () => {
     let finalLink = invitationData.invitationLink;
     if (!finalLink) {
-      finalLink = `${
-        window.location.origin
-      }/join-formation?token=${Math.random().toString(36).substring(2, 15)}`;
+      const expirationTime = Date.now() + 2 * 24 * 60 * 60 * 1000;
+      const linkId = Math.random().toString(36).substring(2, 15);
+      finalLink = `${window.location.origin}/join-formation?token=${linkId}&expires=${expirationTime}`;
 
       setInvitationData((prev) => ({
         ...prev,
         invitationLink: finalLink,
         linkGenerated: true,
+        expiresAt: expirationTime,
       }));
     }
 
@@ -1778,6 +1811,7 @@ const FormationCreator = ({
             recipientEmail: email,
             formationName: formData?.titre || "Formation",
             invitationLink: finalLink,
+            expiresAt: invitationData.expiresAt,
           }),
         });
 
@@ -1823,17 +1857,18 @@ const FormationCreator = ({
 
   const generateLink = () => {
     const linkId = Math.random().toString(36).substring(2, 15);
-    const generatedLink = `http://localhost:3000/invite/${linkId}`;
+    const expirationTime = Date.now() + 2 * 24 * 60 * 60 * 1000;
+    const generatedLink = `http://localhost:3000/invite/${linkId}?expires=${expirationTime}`;
 
     setInvitationData((prev) => ({
       ...prev,
       invitationLink: generatedLink,
       linkGenerated: true,
+      expiresAt: expirationTime,
     }));
   };
 
   const createInvitation = async () => {
-    // Use the correct formation ID based on mode
     const formationIdToUse = mode === "edit" ? currentFormationId : formationId;
 
     if (!formationIdToUse) {
@@ -1842,7 +1877,7 @@ const FormationCreator = ({
     }
 
     if (formData.accessType !== "private") {
-      return true; // No invitation needed for public formations
+      return true;
     }
 
     try {
@@ -1867,13 +1902,15 @@ const FormationCreator = ({
 
         case "link":
           if (!invitationData.linkGenerated) {
-            // Generate a unique invitation link
             const linkId = Math.random().toString(36).substring(2, 15);
-            invitationPayload.invitationLink = `http://localhost:3000/invite/${linkId}`;
+            const expirationTime = Date.now() + 2 * 24 * 60 * 60 * 1000;
+            invitationPayload.invitationLink = `http://localhost:3000/invite/${linkId}?expires=${expirationTime}`;
             invitationPayload.linkGenerated = true;
+            invitationPayload.expiresAt = expirationTime;
           } else {
             invitationPayload.invitationLink = invitationData.invitationLink;
             invitationPayload.linkGenerated = true;
+            invitationPayload.expiresAt = invitationData.expiresAt;
           }
           break;
 
@@ -1912,6 +1949,14 @@ const FormationCreator = ({
     } finally {
       setIsCreatingInvitation(false);
     }
+  };
+
+  const isLinkExpired = (expiresAt: number) => {
+    return Date.now() > expiresAt;
+  };
+
+  const formatExpirationDate = (expiresAt: number) => {
+    return new Date(expiresAt).toLocaleString();
   };
 
   const handleNextStep = async () => {
@@ -2047,6 +2092,11 @@ const FormationCreator = ({
 
   const confirmDates = () => {
     if (startDate && endDate) {
+      setFormData((prev) => ({
+        ...prev,
+        startDate: startDate,
+        endDate: endDate,
+      }));
       setIsOpen(false);
     }
   };
@@ -2055,7 +2105,7 @@ const FormationCreator = ({
     if (startDate && endDate) {
       return `${formatDate(startDate)} - ${formatDate(endDate)}`;
     }
-    return "Start Date And End Date *";
+    return "Sélectionner les dates *";
   };
 
   const today = new Date();
@@ -3383,8 +3433,17 @@ const FormationCreator = ({
                           <input
                             readOnly
                             value={invitationData.invitationLink}
-                            className={`${inputClass} bg-white`}
+                            className={`${inputClass} bg-white mb-2`}
                           />
+                          <p className="text-sm text-gray-600">
+                            <strong>Expires:</strong>{" "}
+                            {formatExpirationDate(invitationData.expiresAt)}
+                          </p>
+                          {isLinkExpired(invitationData.expiresAt) && (
+                            <p className="text-red-600 text-sm font-medium mt-1">
+                              ⚠️ This link has expired
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
