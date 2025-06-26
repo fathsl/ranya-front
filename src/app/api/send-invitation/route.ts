@@ -66,6 +66,7 @@ export async function POST(request: Request) {
               If the button doesn't work, copy and paste this link into your browser:<br>
               <span style="word-break: break-all;">${invitationLink}</span>
             </p>
+            <p className="text-gray-600">Lien expiré dans 2 jours</p>
             <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;">
             <p style="color: #666; font-size: 12px;">
               This invitation was sent from Formation Team

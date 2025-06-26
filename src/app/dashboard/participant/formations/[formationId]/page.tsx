@@ -1188,7 +1188,7 @@ const FormationDetailsParticipant = () => {
                 className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all duration-200 flex items-center justify-center gap-2"
               >
                 <PlayCircleIcon size={20} />
-                Commencer l&apos;apprentissage
+                Commencer le test
               </button>
               // <div className="bg-white rounded-xl shadow-lg p-6">
               //   {allResourcesCompleted ? (

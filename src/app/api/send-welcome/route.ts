@@ -73,13 +73,7 @@ export async function POST(request: Request) {
                 <strong style="color: #374151;">Password:</strong> 
                 <span style="color: #dc2626; font-family: monospace; background-color: #fef2f2; padding: 4px 8px; border-radius: 4px;">${password}</span>
               </div>
-            </div>
-            
-            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 24px 0;">
-              <p style="margin: 0; color: #92400e; font-size: 14px;">
-                <strong>Important Security Notice:</strong> Please change your password after your first login for security purposes.
-              </p>
-            </div>
+            </div
             
             <div style="text-align: center; margin: 30px 0;">
               <a href="${

@@ -15,6 +15,7 @@ import {
   XIcon,
 } from "lucide-react";
 import ReminderDrawer from "@/components/ReminderDrawer";
+import Link from "next/link";
 
 interface User {
   id: string;
@@ -680,9 +681,9 @@ const FormationCalendar = () => {
                 >
                   Fermer
                 </button>
-                <button className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all">
+                <Link href={`/dashboard/formateur/formations/edit/${selectedFormation.id}`}><button className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all">
                   Modifier la formation
-                </button>
+                </button></Link>
               </div>
             </div>
           </div>

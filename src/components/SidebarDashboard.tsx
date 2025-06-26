@@ -70,7 +70,7 @@ const Sidebar = () => {
 
     {
       id: "certificats",
-      label: "My Certificats",
+      label: "Mes Certificats",
       icon: AwardIcon,
       href: "/dashboard/participant/certificates",
     },
