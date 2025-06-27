@@ -33,6 +33,7 @@ export default function LoginPage() {
     linkedInLink: "",
     password: "",
     confirmPassword: "",
+    isAccepted: true,
   });
 
   const handleSubmit = async (e: FormEvent) => {
@@ -65,15 +66,19 @@ export default function LoginPage() {
         if (data.user.role === "formateur") {
           router.push("/dashboard/formateur/dashboard");
         } else if (data.user.role === "participant") {
-          setProfileData({
-            name: data.user.name || "",
-            telephone: data.user.telephone || "",
-            linkedInLink: data.user.linkedInLink || "",
-            password: "",
-            confirmPassword: "",
-          });
-          setShowUpdateProfileDialog(true);
-          // router.push("/dashboard/participant/dashboard"); // Optional
+          if (data.user.isAccepted === null) {
+            setProfileData({
+              name: data.user.name || "",
+              telephone: data.user.telephone || "",
+              linkedInLink: data.user.linkedInLink || "",
+              password: "",
+              confirmPassword: "",
+              isAccepted: true,
+            });
+            setShowUpdateProfileDialog(true);
+          } else {
+            router.push("/dashboard/participant/dashboard");
+          }
         } else if (data.user.role === "admin") {
           router.push("/dashboard/admin/dashboard");
         } else {
@@ -111,8 +116,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // Update localStorage and global state
-        const updatedUser = { ...user, ...profileData };
+        const updatedUser = { ...user, ...profileData, isAccepted: true };
         localStorage.setItem("user", JSON.stringify(updatedUser));
         setUser(updatedUser);
 

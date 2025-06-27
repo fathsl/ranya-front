@@ -1867,7 +1867,7 @@ const FormationCreator = ({
   const generateLink = () => {
     const linkId = Math.random().toString(36).substring(2, 15);
     const expirationTime = Date.now() + 2 * 24 * 60 * 60 * 1000;
-    const generatedLink = `http://localhost:3000/dashboard/participant/formations//${linkId}?expires=${expirationTime}`;
+    const generatedLink = `http://localhost:3000/invit-formation/${linkId}?expires=${expirationTime}`;
 
     setInvitationData((prev) => ({
       ...prev,
@@ -1911,9 +1911,8 @@ const FormationCreator = ({
 
         case "link":
           if (!invitationData.linkGenerated) {
-            const linkId = Math.random().toString(36).substring(2, 15);
             const expirationTime = Date.now() + 2 * 24 * 60 * 60 * 1000;
-            invitationPayload.invitationLink = `http://localhost:3000/dashboard/participant/formations/${linkId}?expires=${expirationTime}`;
+            invitationPayload.invitationLink = `http://localhost:3000/dashboard/participant/formations/${formationIdToUse}?expires=${expirationTime}`;
             invitationPayload.linkGenerated = true;
             invitationPayload.expiresAt = expirationTime;
           } else {
@@ -3351,7 +3350,7 @@ const FormationCreator = ({
                         icon: MailIcon,
                         label: "Email Invites",
                       },
-                      // { value: "link", icon: Link2Icon, label: "Invite Link" },
+                      { value: "link", icon: Link2Icon, label: "Invite Link" },
                       { value: "csv", icon: FileTextIcon, label: "CSV Upload" },
                     ].map((option) => (
                       <label
@@ -3423,7 +3422,7 @@ const FormationCreator = ({
                     </div>
                   )}
 
-                  {/* {invitationData.mode === "link" && (
+                  {invitationData.mode === "link" && (
                     <div>
                       {!invitationData.linkGenerated ? (
                         <button
@@ -3454,7 +3453,7 @@ const FormationCreator = ({
                         </div>
                       )}
                     </div>
-                  )} */}
+                  )}
 
                   {invitationData.mode === "csv" && (
                     <div>

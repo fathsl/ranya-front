@@ -34,7 +34,7 @@ interface QuizComponentProps {
   moduleId: string;
   onClose: () => void;
   onScoreUpdate: (moduleId: string, score: number) => void;
-  user: any; // Replace with your user type
+  user?: any; // Replace with your user type
 }
 
 const QuizComponent: React.FC<QuizComponentProps> = ({

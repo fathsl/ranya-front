@@ -4,7 +4,6 @@ import "./globals.css";
 import Script from "next/script";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/contexts/authContext";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import LandingLayout from "./landing-layout";
 import AuthLayout from "./auth-layout";
@@ -35,7 +34,9 @@ export default function RootLayout({
 
           <Toaster position="top-center" richColors />
 
-          {pathname === "/" && <LandingLayout>{children}</LandingLayout>}
+          {(pathname === "/" || pathname.startsWith("/invit-formation")) && (
+            <LandingLayout>{children}</LandingLayout>
+          )}
 
           {(pathname === "/login" || pathname === "/register") && (
             <AuthLayout>{children}</AuthLayout>
@@ -43,7 +44,8 @@ export default function RootLayout({
 
           {pathname !== "/" &&
             pathname !== "/login" &&
-            pathname !== "/register" && (
+            pathname !== "/register" &&
+            !pathname.startsWith("/invit-formation") && (
               <div className="min-h-screen bg-gray-100 w-full flex">
                 <Sidebar />
 
