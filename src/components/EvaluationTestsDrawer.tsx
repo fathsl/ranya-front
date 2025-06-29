@@ -78,9 +78,10 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
 
   // Questions state
-  const [questions, setQuestions] = useState<{ [testId: string]: Question[] }>(
-    {}
-  );
+  const [questions, setQuestions] = useState<{
+    [formationId: string]: Question[];
+  }>({});
+
   const [loadingQuestions, setLoadingQuestions] = useState<{
     [testId: string]: boolean;
   }>({});
@@ -147,64 +148,86 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
       order: 1,
     });
   };
-  const fetchQuestions = async (evaluationTestId: string) => {
-    setLoadingQuestions((prev) => ({ ...prev, [evaluationTestId]: true }));
+  const fetchQuestions = async (formationId: string) => {
+    console.log("Fetching questions for formationId:", formationId);
     try {
-      const response = await fetch(
-        `http://127.0.0.1:3001/questions?evaluationTestId=${evaluationTestId}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        console.log("data", data);
-        setQuestions((prev) => ({ ...prev, [evaluationTestId]: data }));
-      }
-    } catch (error) {
-      console.error("Error fetching questions:", error);
-    } finally {
-      setLoadingQuestions((prev) => ({ ...prev, [evaluationTestId]: false }));
-    }
-  };
-
-  const createQuestion = async (
-    evaluationTestId: string,
-    questionData: Omit<Question, "id">
-  ) => {
-    try {
+      // Try the original endpoint first if your backend still uses this structure
       const response = await fetch("http://127.0.0.1:3001/questions", {
-        method: "POST",
+        method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ...questionData, evaluationTestId }),
       });
 
       if (response.ok) {
-        const newQuestion = await response.json();
+        const allQuestions = await response.json();
+        console.log("All questions received:", allQuestions);
+
+        // Filter questions by formationId on the frontend
+        const filteredQuestions = allQuestions.filter(
+          (question: Question) => question.formationId === formationId
+        );
+
+        console.log(
+          "Filtered questions for formationId",
+          formationId,
+          ":",
+          filteredQuestions
+        );
+
         setQuestions((prev) => ({
           ...prev,
-          [evaluationTestId]: [...(prev[evaluationTestId] || []), newQuestion],
+          [formationId]: filteredQuestions,
         }));
-        return newQuestion;
+      } else {
+        console.error("Failed to fetch questions, status:", response.status);
       }
     } catch (error) {
-      console.error("Error creating question:", error);
-      throw error;
+      console.error("Error fetching questions:", error);
     }
   };
 
+  // const createQuestion = async (
+  //   evaluationTestId: string,
+  //   questionData: Omit<Question, "id">
+  // ) => {
+  //   try {
+  //     const response = await fetch("http://127.0.0.1:3001/questions", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: JSON.stringify({ ...questionData, evaluationTestId }),
+  //     });
+
+  //     if (response.ok) {
+  //       const newQuestion = await response.json();
+  //       setQuestions((prev) => ({
+  //         ...prev,
+  //         [evaluationTestId]: [...(prev[evaluationTestId] || []), newQuestion],
+  //       }));
+  //       return newQuestion;
+  //     }
+  //   } catch (error) {
+  //     console.error("Error creating question:", error);
+  //     throw error;
+  //   }
+  // };
+
   const updateQuestion = async (
     questionId: string,
-    questionData: Partial<Question>
+    questionData: Partial<Question>,
+    formationId: string
   ) => {
     try {
       const response = await fetch(
         `http://127.0.0.1:3001/questions/${questionId}`,
         {
-          method: "PUT",
+          method: "PATCH",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(questionData),
+          body: JSON.stringify({ questionData, formationId }),
         }
       );
 
@@ -314,46 +337,64 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
   };
 
   const handleToggleQuestions = async (testId: string) => {
+    // Find the formation ID for this evaluation test
+    const evaluationTest = evaluationTests.find((test) => test.id === testId);
+    const formationId = evaluationTest?.formationId;
+
+    if (!formationId) {
+      console.error("Formation ID not found for test:", testId);
+      return;
+    }
+
     if (expandedTestId === testId) {
       setExpandedTestId(null);
     } else {
       setExpandedTestId(testId);
-      if (!questions[testId]) {
-        await fetchQuestions(testId);
+      // Check if questions for this formation are already loaded
+      if (!questions[formationId] || questions[formationId].length === 0) {
+        await fetchQuestions(formationId);
       }
     }
   };
 
-  const handleCreateQuestion = async () => {
-    if (
-      !creatingQuestion ||
-      !questionForm.question ||
-      !questionForm.correctAnswer
-    ) {
-      alert("Veuillez remplir tous les champs obligatoires");
+  const handleCreateQuestion = async (formationId: string) => {
+    if (!questionForm.question?.trim() || !questionForm.correctAnswer) {
+      alert("Veuillez remplir les champs obligatoires");
       return;
     }
 
     setLoading(true);
     try {
-      const maxOrder = Math.max(
-        0,
-        ...(questions[creatingQuestion]?.map((q) => q.order) || [])
-      );
-      await createQuestion(creatingQuestion, {
-        ...(questionForm as Omit<Question, "id">),
-        order: maxOrder + 1,
+      const response = await fetch("http://127.0.0.1:3001/questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...questionForm,
+          formationId, // Use formationId instead of evaluationTestId
+        }),
       });
-      setCreatingQuestion(null);
-      resetQuestionForm();
+
+      if (response.ok) {
+        const newQuestion = await response.json();
+        // Update the questions state for this formation
+        setQuestions((prev) => ({
+          ...prev,
+          [formationId]: [...(prev[formationId] || []), newQuestion],
+        }));
+
+        setCreatingQuestion(null);
+        resetQuestionForm();
+      }
     } catch (error) {
-      alert("Erreur lors de la création de la question");
+      console.error("Error creating question:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateQuestion = async () => {
+  const handleUpdateQuestion = async (formationId: string) => {
     if (
       !editingQuestion ||
       !questionForm.question ||
@@ -365,7 +406,7 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
 
     setLoading(true);
     try {
-      await updateQuestion(editingQuestion.id, questionForm);
+      await updateQuestion(editingQuestion.id, questionForm, formationId);
       setEditingQuestion(null);
       resetQuestionForm();
     } catch (error) {
@@ -417,222 +458,243 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
     );
   };
 
-  const renderQuestionForm = () => (
-    <div className="bg-gray-50 p-4 rounded-lg mb-4">
-      <h4 className="font-medium text-gray-900 mb-4">
-        {editingQuestion ? "Modifier la question" : "Nouvelle question"}
-      </h4>
+  const renderQuestionForm = (testId: string) => {
+    const evaluationTest = evaluationTests.find((test) => test.id === testId);
+    const formationId = evaluationTest?.formationId;
+    console.log("formationId", formationId);
+    console.log("evaluationTest", evaluationTest);
 
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Type de question
-          </label>
-          <select
-            value={questionForm.type}
-            onChange={(e) =>
-              setQuestionForm({
-                ...questionForm,
-                type: e.target.value as Question["type"],
-                options:
-                  e.target.value === "multiple-choice"
-                    ? ["", "", "", ""]
-                    : undefined,
-              })
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="multiple-choice">Choix multiple</option>
-            <option value="true-false">Vrai/Faux</option>
-            <option value="short-answer">Réponse courte</option>
-          </select>
-        </div>
+    if (!formationId) return null;
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Question *
-          </label>
-          <textarea
-            value={questionForm.question}
-            onChange={(e) =>
-              setQuestionForm({ ...questionForm, question: e.target.value })
-            }
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Saisissez votre question..."
-          />
-        </div>
+    return (
+      <div className="bg-gray-50 p-4 rounded-lg mb-4">
+        <h4 className="font-medium text-gray-900 mb-4">
+          {editingQuestion ? "Modifier la question" : "Nouvelle question"}
+        </h4>
 
-        {questionForm.type === "multiple-choice" && (
+        <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Options de réponse
+              Type de question
             </label>
-            {questionForm.options?.map((option, index) => (
-              <div key={index} className="flex items-center gap-2 mb-2">
-                <input
-                  type="text"
-                  value={option}
-                  onChange={(e) => {
-                    const newOptions = [...(questionForm.options || [])];
-                    newOptions[index] = e.target.value;
-                    setQuestionForm({ ...questionForm, options: newOptions });
-                  }}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder={`Option ${index + 1}`}
-                />
-                <input
-                  type="radio"
-                  name="correctAnswer"
-                  checked={questionForm.correctAnswer === option}
-                  onChange={() =>
-                    setQuestionForm({ ...questionForm, correctAnswer: option })
-                  }
-                  className="w-4 h-4 text-blue-600"
-                />
-              </div>
-            ))}
+            <select
+              value={questionForm.type}
+              onChange={(e) =>
+                setQuestionForm({
+                  ...questionForm,
+                  type: e.target.value as Question["type"],
+                  options:
+                    e.target.value === "multiple-choice"
+                      ? ["", "", "", ""]
+                      : undefined,
+                })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="multiple-choice">Choix multiple</option>
+              <option value="true-false">Vrai/Faux</option>
+              <option value="short-answer">Réponse courte</option>
+            </select>
           </div>
-        )}
 
-        {questionForm.type === "true-false" && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Réponse correcte
+              Question *
             </label>
-            <div className="flex gap-4">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="correctAnswer"
-                  value="true"
-                  checked={questionForm.correctAnswer === "true"}
-                  onChange={(e) =>
-                    setQuestionForm({
-                      ...questionForm,
-                      correctAnswer: e.target.value,
-                    })
-                  }
-                  className="w-4 h-4 text-blue-600 mr-2"
-                />
-                Vrai
+            <textarea
+              value={questionForm.question}
+              onChange={(e) =>
+                setQuestionForm({ ...questionForm, question: e.target.value })
+              }
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Saisissez votre question..."
+            />
+          </div>
+
+          {questionForm.type === "multiple-choice" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Options de réponse
               </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="correctAnswer"
-                  value="false"
-                  checked={questionForm.correctAnswer === "false"}
-                  onChange={(e) =>
-                    setQuestionForm({
-                      ...questionForm,
-                      correctAnswer: e.target.value,
-                    })
-                  }
-                  className="w-4 h-4 text-blue-600 mr-2"
-                />
-                Faux
+              {questionForm.options?.map((option, index) => (
+                <div key={index} className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={option}
+                    onChange={(e) => {
+                      const newOptions = [...(questionForm.options || [])];
+                      newOptions[index] = e.target.value;
+                      setQuestionForm({ ...questionForm, options: newOptions });
+                    }}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={`Option ${index + 1}`}
+                  />
+                  <input
+                    type="radio"
+                    name="correctAnswer"
+                    checked={questionForm.correctAnswer === option}
+                    onChange={() =>
+                      setQuestionForm({
+                        ...questionForm,
+                        correctAnswer: option,
+                      })
+                    }
+                    className="w-4 h-4 text-blue-600"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {questionForm.type === "true-false" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Réponse correcte
               </label>
+              <div className="flex gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="correctAnswer"
+                    value="true"
+                    checked={questionForm.correctAnswer === "true"}
+                    onChange={(e) =>
+                      setQuestionForm({
+                        ...questionForm,
+                        correctAnswer: e.target.value,
+                      })
+                    }
+                    className="w-4 h-4 text-blue-600 mr-2"
+                  />
+                  Vrai
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="correctAnswer"
+                    value="false"
+                    checked={questionForm.correctAnswer === "false"}
+                    onChange={(e) =>
+                      setQuestionForm({
+                        ...questionForm,
+                        correctAnswer: e.target.value,
+                      })
+                    }
+                    className="w-4 h-4 text-blue-600 mr-2"
+                  />
+                  Faux
+                </label>
+              </div>
+            </div>
+          )}
+
+          {questionForm.type === "short-answer" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Réponse correcte *
+              </label>
+              <input
+                type="text"
+                value={questionForm.correctAnswer}
+                onChange={(e) =>
+                  setQuestionForm({
+                    ...questionForm,
+                    correctAnswer: e.target.value,
+                  })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Réponse attendue"
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Points
+              </label>
+              <input
+                type="number"
+                value={questionForm.points}
+                onChange={(e) =>
+                  setQuestionForm({
+                    ...questionForm,
+                    points: parseInt(e.target.value),
+                  })
+                }
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ordre
+              </label>
+              <input
+                type="number"
+                value={questionForm.order}
+                onChange={(e) =>
+                  setQuestionForm({
+                    ...questionForm,
+                    order: parseInt(e.target.value),
+                  })
+                }
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
           </div>
-        )}
 
-        {questionForm.type === "short-answer" && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Réponse correcte *
+              Explication (optionnel)
             </label>
-            <input
-              type="text"
-              value={questionForm.correctAnswer}
+            <textarea
+              value={questionForm.explanation}
               onChange={(e) =>
                 setQuestionForm({
                   ...questionForm,
-                  correctAnswer: e.target.value,
+                  explanation: e.target.value,
                 })
               }
+              rows={2}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Réponse attendue"
+              placeholder="Explication de la réponse..."
             />
           </div>
-        )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Points
-            </label>
-            <input
-              type="number"
-              value={questionForm.points}
-              onChange={(e) =>
-                setQuestionForm({
-                  ...questionForm,
-                  points: parseInt(e.target.value),
-                })
+          <div className="flex gap-2">
+            {/* <button
+              onClick={
+                editingQuestion
+                  ? () => handleUpdateQuestion(formationId)
+                  : () => handleCreateQuestion(formationId)
               }
-              min="1"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+              disabled={loading}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              {loading
+                ? "Sauvegarde..."
+                : editingQuestion
+                ? "Modifier"
+                : "Créer"}
+            </button> */}
+            <button
+              onClick={() => {
+                setEditingQuestion(null);
+                setCreatingQuestion(null);
+                resetQuestionForm();
+              }}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              Annuler
+            </button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ordre
-            </label>
-            <input
-              type="number"
-              value={questionForm.order}
-              onChange={(e) =>
-                setQuestionForm({
-                  ...questionForm,
-                  order: parseInt(e.target.value),
-                })
-              }
-              min="1"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Explication (optionnel)
-          </label>
-          <textarea
-            value={questionForm.explanation}
-            onChange={(e) =>
-              setQuestionForm({ ...questionForm, explanation: e.target.value })
-            }
-            rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Explication de la réponse..."
-          />
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={
-              editingQuestion ? handleUpdateQuestion : handleCreateQuestion
-            }
-            disabled={loading}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
-          >
-            {loading ? "Sauvegarde..." : editingQuestion ? "Modifier" : "Créer"}
-          </button>
-          <button
-            onClick={() => {
-              setEditingQuestion(null);
-              setCreatingQuestion(null);
-              resetQuestionForm();
-            }}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-          >
-            Annuler
-          </button>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (!isOpen) return null;
 
@@ -908,7 +970,7 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
                               <TargetIcon size={14} />
                               <span>{test.passingScore}% requis</span>
                             </div>
-                            <div className="flex items-center gap-1">
+                            {/* <div className="flex items-center gap-1">
                               <ClipboardCheckIcon size={14} />
                               <span>
                                 {questions[test.id!]?.length || 0} question
@@ -916,7 +978,7 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
                                   ? "s"
                                   : ""}
                               </span>
-                            </div>
+                            </div> */}
                           </div>
                         </div>
 
@@ -970,13 +1032,11 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
                             </button>
                           </div>
 
-                          {/* Question Creation Form */}
-                          {creatingQuestion === test.id && renderQuestionForm()}
-
-                          {/* Question Editing Form */}
+                          {creatingQuestion === test.id &&
+                            renderQuestionForm(test.id)}
                           {editingQuestion &&
-                            editingQuestion.evaluationTestId === test.id &&
-                            renderQuestionForm()}
+                            editingQuestion.formationId === test.formationId &&
+                            renderQuestionForm(test.id)}
 
                           {/* Questions List */}
                           {loadingQuestions[test.id!] ? (
@@ -986,9 +1046,9 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
                                 Chargement des questions...
                               </p>
                             </div>
-                          ) : questions[test.id!]?.length > 0 ? (
+                          ) : questions[test.formationId]?.length > 0 ? (
                             <div className="space-y-3">
-                              {questions[test.id!]
+                              {questions[test.formationId]
                                 .sort((a, b) => a.order - b.order)
                                 .map((question, index) => (
                                   <div
@@ -1062,7 +1122,7 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
                                       </div>
 
                                       <div className="flex items-center gap-1 ml-4">
-                                        <button
+                                        {/* <button
                                           onClick={() =>
                                             handleEditQuestion(question)
                                           }
@@ -1070,7 +1130,7 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
                                           title="Modifier"
                                         >
                                           <EditIcon size={14} />
-                                        </button>
+                                        </button> */}
                                         <button
                                           onClick={() =>
                                             setDeleteConfirmQuestionId(
@@ -1088,16 +1148,14 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
                                 ))}
                             </div>
                           ) : (
-                            <div className="text-center py-8 text-gray-500">
-                              <ClipboardCheckIcon
-                                size={32}
-                                className="mx-auto mb-2 opacity-50"
-                              />
-                              <p>Aucune question pour ce test</p>
-                              <p className="text-sm">
-                                Cliquez sur &apos;&apos;Ajouter une
-                                question&apos; pour commencer
-                              </p>
+                            <div className="text-gray-500 italic py-4">
+                              Aucune question trouvée pour cette formation
+                              <button
+                                onClick={() => fetchQuestions(test.formationId)}
+                                className="ml-2 text-blue-600 underline hover:text-blue-800"
+                              >
+                                Recharger les questions
+                              </button>
                             </div>
                           )}
                         </div>

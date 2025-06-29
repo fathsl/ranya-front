@@ -1,34 +1,66 @@
 "use client";
 
-import CertificateViewModal from "@/components/CertificateView";
 import {
-  ActivityIcon,
   AlertCircleIcon,
   AwardIcon,
-  BellIcon,
   BookOpenIcon,
   CalendarIcon,
   CheckCircleIcon,
-  MailIcon,
-  PhoneIcon,
+  DownloadIcon,
+  LoaderIcon,
+  TargetIcon,
   TrendingUpIcon,
-  UserIcon,
-  XCircleIcon,
+  UsersIcon,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+interface Resource {
+  id: string;
+  title: string;
+  type: string;
+  videoLink?: string;
+  pdfLink?: string;
+  textLink?: string;
+  content?: string;
+  duration?: number;
+  isCompleted: boolean;
+  thumbnail?: string;
+  description?: string;
+  moduleId: string;
+  module: Module;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Module {
+  id: string;
+  titre?: string;
+  name?: string;
+  resources: Resource[];
+}
+
 interface User {
   id: string;
   name: string;
-  email: string;
-  telephone?: string;
-  role: "participant" | "formateur" | "admin";
-  status: "active" | "inactive" | "suspended";
-  hasCertificate: boolean;
-  formations?: Formation[];
-  createdAt: string;
-  updatedAt: string;
+  role: string;
+  email?: string;
+}
+
+interface Participant {
+  id: string;
+  nom?: string;
+  email?: string;
+}
+
+interface Certificate {
+  id: string;
+  nomParticipant: string;
+  formation: string;
+  formationEntity?: Formation;
+  dateObtention: string;
+  urlPdf: string;
+  participants: Participant[];
 }
 
 interface Formation {
@@ -48,40 +80,20 @@ interface Formation {
   };
   user: User;
   userId: string;
-  modules: ModuleEntity[];
-  participants: Participant[];
+  modules: Module[];
+  participants: User[];
   createdAt: string | Date;
   updatedAt: string | Date;
 }
 
-interface ModuleEntity {
-  id: string;
-  titre: string;
-  description?: string;
-  duration?: number;
-  order?: number;
-  completed?: boolean;
-  progress?: number;
-}
-
-interface Participant {
-  id: string;
-  user: User;
-  formation: Formation;
-  enrolledAt: string;
-  completedAt?: string;
-  progress: number;
-  status: "enrolled" | "in-progress" | "completed" | "dropped";
-}
-
-interface Certificate {
-  id: string;
-  nomParticipant: string;
-  formation: string;
-  formationEntity?: Formation;
-  dateObtention: string;
-  urlPdf: string;
-  participants: Participant[];
+interface EvaluationTest {
+  id?: string;
+  isEnabled: boolean;
+  title: string;
+  timeLimit: number;
+  passingScore: number;
+  description: string;
+  questions: any[];
 }
 
 const ParticipantDashboard = () => {
@@ -90,12 +102,11 @@ const ParticipantDashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [formations, setFormations] = useState<Formation[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
+  const [evaluations, setEvaluations] = useState<EvaluationTest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCertificateId, setSelectedCertificateId] = useState<
-    string | null
-  >(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const fetchUser = async (userId: string): Promise<User> => {
     const response = await fetch(`http://127.0.0.1:3001/users/${userId}`, {
@@ -112,513 +123,386 @@ const ParticipantDashboard = () => {
     }
 
     const userData = await response.json();
+    setUser(userData);
     return userData;
   };
 
-  const fetchFormations = async (userId: string): Promise<Formation[]> => {
-    const response = await fetch("http://127.0.0.1:3001/formations", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+  useEffect(() => {
+    const fetchData = async () => {
+      await fetchUser(userId);
+    };
 
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch formations: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const formationsData = await response.json();
-
-    const userFormations = formationsData.filter((formation: Formation) =>
-      formation.participants.some((user: Participant) => user.id === userId)
-    );
-
-    return userFormations;
-  };
-
-  const fetchCertificates = async (userId: string): Promise<Certificate[]> => {
-    const response = await fetch(
-      `http://127.0.0.1:3001/certificats/user/${userId}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch certificates: ${response.status} ${response.statusText}`
-      );
-    }
-
-    const certificatesData = await response.json();
-    return certificatesData;
-  };
+    fetchData();
+  }, [userId]);
 
   useEffect(() => {
+    if (!user?.id) return;
+
     const fetchAllData = async () => {
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
+      setLoading(true);
 
       try {
-        setLoading(true);
-        setError(null);
+        // 1. Formations
+        const formationsRes = await fetch("http://127.0.0.1:3001/formations");
+        const formationsData = await formationsRes.json();
+        const activeFormations = formationsData.filter(
+          (formation: Formation) =>
+            !formation.archived &&
+            formation.participants?.some(
+              (participant: any) => participant.id === user.id
+            )
+        );
+        setFormations(activeFormations);
 
-        const userData = await fetchUser(userId);
-        setUser(userData);
+        // 2. Certificates
+        const certRes = await fetch("http://127.0.0.1:3001/certificats");
+        const certData: Certificate[] = await certRes.json();
+        const userCertificates = certData.filter((certificate) =>
+          certificate.participants?.some((p) => p.id === user.id)
+        );
+        setCertificates(userCertificates);
 
-        const formationsData = await fetchFormations(userId);
-        setFormations(formationsData);
+        // 3. Questions
+        const questionsRes = await fetch("http://127.0.0.1:3001/questions");
+        const questionsData = await questionsRes.json();
+        setQuestions(questionsData);
 
-        const certificatesData = await fetchCertificates(userId);
-        setCertificates(certificatesData);
-      } catch (err) {
-        const errorMessage = `Failed to load participant data: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`;
-        setError(errorMessage);
-        console.error("Error fetching data:", err);
+        // 4. Resources
+        const resourcesRes = await fetch("http://127.0.0.1:3001/resources");
+        const resourcesData = await resourcesRes.json();
+        setResources(resourcesData);
+
+        // 5. Evaluations
+        const evaluationsRes = await fetch(
+          "http://127.0.0.1:3001/evaluation-tests"
+        );
+        const evaluationsData = await evaluationsRes.json();
+        setEvaluations(evaluationsData);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+        setError("Erreur de chargement des données.");
       } finally {
         setLoading(false);
       }
     };
 
     fetchAllData();
-  }, [userId]);
+  }, [user?.id]);
 
-  const handleViewCertificate = (certificateId: string) => {
-    setSelectedCertificateId(certificateId);
-    setIsModalOpen(true);
-  };
-
-  const handleDownloadCertificate = (
-    certificateId: string,
-    fileName: string
-  ) => {
-    console.log("Télécharger certificat:", certificateId, fileName);
-
-    const certificate = certificates.find((cert) => cert.id === certificateId);
-    if (!certificate) {
-      console.error("Certificate not found");
-      return;
+  const calculateProgress = (formation: Formation) => {
+    if (!formation.modules || formation.modules.length === 0) {
+      return 0;
     }
-  };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedCertificateId(null);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "text-green-600 bg-green-100";
-      case "inactive":
-        return "text-gray-600 bg-gray-100";
-      case "suspended":
-        return "text-red-600 bg-red-100";
-      default:
-        return "text-gray-600 bg-gray-100";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active":
-        return <CheckCircleIcon className="w-4 h-4" />;
-      case "inactive":
-        return <AlertCircleIcon className="w-4 h-4" />;
-      case "suspended":
-        return <XCircleIcon className="w-4 h-4" />;
-      default:
-        return <AlertCircleIcon className="w-4 h-4" />;
-    }
-  };
-
-  const calculateOverallProgress = () => {
-    if (formations.length === 0) return 0;
-    const totalProgress = formations.reduce((sum, formation) => {
-      const moduleProgress = formation.modules.reduce(
-        (moduleSum, module) => moduleSum + (module.progress || 0),
-        0
-      );
-      return sum + moduleProgress / formation.modules.length;
-    }, 0);
-    return Math.round(totalProgress / formations.length);
-  };
-
-  const getTotalCompletedModules = () => {
-    return formations.reduce(
-      (total, formation) =>
-        total + formation.modules.filter((module) => module.completed).length,
-      0
-    );
-  };
-
-  const getTotalModules = () => {
-    return formations.reduce(
-      (total, formation) => total + formation.modules.length,
-      0
-    );
-  };
-
-  const handleSendReminder = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await fetch("http://127.0.0.1:3001/notifications/add", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: "⏰ Rappel : votre formation commence bientôt",
-          body: `N’oubliez pas de la rejoindre la formation à l’heure prévue.
-                  Cliquez ici pour accéder à la session.`,
-          type: "formation_reminder",
-          userIds: [userId],
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erreur lors de l'envoi de la notification");
+    const completedModules = formation.modules.filter((module) => {
+      if (!module.resources || module.resources.length === 0) {
+        return true;
       }
-    } catch (err) {
-      setError(err.message || "Une erreur est survenue");
-    } finally {
-      setLoading(false);
-    }
+
+      return module.resources.every((resource) => resource.isCompleted);
+    }).length;
+
+    return (completedModules / formation.modules.length) * 100;
+  };
+
+  const getOverallStats = () => {
+    const totalFormations = formations.length;
+    const completedFormations = formations.filter(
+      (f) => calculateProgress(f) === 100
+    ).length;
+    const totalCertificates = certificates.length;
+    const averageProgress =
+      formations.length > 0
+        ? formations.reduce((acc, f) => acc + calculateProgress(f), 0) /
+          formations.length
+        : 0;
+
+    return {
+      totalFormations,
+      completedFormations,
+      totalCertificates,
+      averageProgress: Math.round(averageProgress),
+    };
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading participant data...</p>
+          <LoaderIcon className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-4" />
+          <p className="text-gray-600">
+            Chargement de votre tableau de bord...
+          </p>
         </div>
       </div>
     );
   }
 
-  if (error || !user) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <XCircleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600 text-lg">{error || "User not found"}</p>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+          <AlertCircleIcon className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            Erreur de connexion
+          </h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            Réessayer
+          </button>
         </div>
       </div>
     );
   }
+
+  const stats = getOverallStats();
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      <div className="bg-white shadow-lg border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Tableau de Bord
+              </h1>
+              <p className="text-gray-600 mt-1">Bienvenue, {user?.name}</p>
+            </div>
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                {user.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()}
+              <div className="bg-indigo-100 p-3 rounded-full">
+                <BookOpenIcon className="w-6 h-6 text-indigo-600" />
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {user.name}
-                </h1>
-                <p className="text-gray-600 mt-1">Participant Dashboard</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                  user.status
-                )}`}
-              >
-                {getStatusIcon(user.status)}
-                <span className="ml-1 capitalize">{user.status}</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <button
-                onClick={handleSendReminder}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"
-              >
-                <BellIcon size={18} />
-                Envoyer un rappel
-              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Total Formations
+                  Formations Actives
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {formations.length}
+                  {stats.totalFormations}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <div className="bg-blue-100 p-3 rounded-full">
                 <BookOpenIcon className="w-6 h-6 text-blue-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Modules Completed
+                  Formations Terminées
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {getTotalCompletedModules()}/{getTotalModules()}
+                  {stats.completedFormations}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <div className="bg-green-100 p-3 rounded-full">
                 <CheckCircleIcon className="w-6 h-6 text-green-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Overall Progress
-                </p>
+                <p className="text-sm font-medium text-gray-600">Certificats</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {calculateOverallProgress()}%
+                  {stats.totalCertificates}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <TrendingUpIcon className="w-6 h-6 text-purple-600" />
+              <div className="bg-yellow-100 p-3 rounded-full">
+                <AwardIcon className="w-6 h-6 text-yellow-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300">
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  Certificates
+                  Progrès Moyen
                 </p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {certificates.length}
+                  {stats.averageProgress}%
                 </p>
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <AwardIcon className="w-6 h-6 text-yellow-600" />
+              <div className="bg-purple-100 p-3 rounded-full">
+                <TrendingUpIcon className="w-6 h-6 text-purple-600" />
               </div>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-              <UserIcon className="w-5 h-5 mr-2 text-indigo-600" />
-              Participant Information
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <MailIcon className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-600">Email</p>
-                  <p className="font-medium text-gray-900">{user.email}</p>
-                </div>
+          {/* Active Formations */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <BookOpenIcon className="w-5 h-5 mr-2 text-indigo-600" />
+                  Mes Formations
+                </h2>
               </div>
-
-              {user.telephone && (
-                <div className="flex items-center space-x-3">
-                  <PhoneIcon className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="text-sm text-gray-600">Phone</p>
-                    <p className="font-medium text-gray-900">
-                      {user.telephone}
-                    </p>
+              <div className="p-6">
+                {formations.length === 0 ? (
+                  <div className="text-center py-8">
+                    <BookOpenIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">Aucune formation active</p>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="space-y-4">
+                    {formations.map((formation) => {
+                      const progress = calculateProgress(formation);
+                      return (
+                        <div
+                          key={formation.id}
+                          className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-gray-900">
+                                {formation.titre}
+                              </h3>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {formation.domaine}
+                              </p>
+                              <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                                {formation.description}
+                              </p>
+                            </div>
+                            <div className="ml-4 text-right">
+                              <span className="text-sm font-medium text-gray-900">
+                                {Math.round(progress)}%
+                              </span>
+                            </div>
+                          </div>
 
-              <div className="flex items-center space-x-3">
-                <CalendarIcon className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-600">Joined</p>
-                  <p className="font-medium text-gray-900">
-                    {new Date(user.createdAt).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
-              </div>
+                          <div className="mb-3">
+                            <div className="bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                          </div>
 
-              <div className="flex items-center space-x-3">
-                <ActivityIcon className="w-5 h-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-600">Last Activity</p>
-                  <p className="font-medium text-gray-900">
-                    {new Date(user.updatedAt).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
+                          <div className="flex items-center justify-between text-sm text-gray-600">
+                            <span className="flex items-center">
+                              <UsersIcon className="w-4 h-4 mr-1" />
+                              {formation.modules.length} modules
+                            </span>
+                            <span className="flex items-center">
+                              <CalendarIcon className="w-4 h-4 mr-1" />
+                              {new Date(formation.createdAt).toLocaleDateString(
+                                "fr-FR"
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      );
                     })}
-                  </p>
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-              <BookOpenIcon className="w-5 h-5 mr-2 text-indigo-600" />
-              Formations Progress
-            </h2>
-            <div className="space-y-6">
-              {formations.map((formation) => {
-                const completedModules = formation.modules.filter(
-                  (module) => module.completed
-                ).length;
-                const totalModules = formation.modules.length;
-                const progress =
-                  totalModules > 0
-                    ? Math.round((completedModules / totalModules) * 100)
-                    : 0;
-
-                return (
-                  <div
-                    key={formation.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 mb-1">
-                          {formation.titre}
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-2">
-                          {formation.domaine}
-                        </p>
-                        <p className="text-sm text-gray-700">
-                          {formation.description}
-                        </p>
-                      </div>
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          formation.accessType === "public"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-blue-100 text-blue-800"
-                        }`}
+          {/* Certificates & Resources */}
+          <div className="space-y-6">
+            {/* Certificates */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <AwardIcon className="w-5 h-5 mr-2 text-yellow-600" />
+                  Mes Certificats
+                </h2>
+              </div>
+              <div className="p-6">
+                {certificates.length === 0 ? (
+                  <div className="text-center py-4">
+                    <AwardIcon className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">
+                      Aucun certificat obtenu
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {certificates.map((certificate) => (
+                      <div
+                        key={certificate.id}
+                        className="border border-gray-200 rounded-lg p-3"
                       >
-                        {formation.accessType}
-                      </span>
-                    </div>
-
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-700">
-                          Progress: {completedModules}/{totalModules} modules
-                        </span>
-                        <span className="text-sm font-medium text-gray-900">
-                          {progress}%
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      {formation.modules.map((module) => (
-                        <div
-                          key={module.id}
-                          className="flex items-center space-x-2"
-                        >
-                          <div
-                            className={`w-2 h-2 rounded-full ${
-                              module.completed ? "bg-green-500" : "bg-gray-300"
-                            }`}
-                          ></div>
-                          <span
-                            className={`text-xs ${
-                              module.completed
-                                ? "text-green-700"
-                                : "text-gray-600"
-                            }`}
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">
+                              {certificate.formation}
+                            </h4>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {new Date(
+                                certificate.dateObtention
+                              ).toLocaleDateString("fr-FR")}
+                            </p>
+                          </div>
+                          <button
+                            // onClick={() =>
+                            //   window.open(certificate.urlPdf, "_blank")
+                            // }
+                            className="ml-2 p-1 text-indigo-600 hover:text-indigo-800 transition-colors"
                           >
-                            {module.titre}
-                          </span>
+                            <DownloadIcon className="w-4 h-4" />
+                          </button>
                         </div>
-                      ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Resources */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <TargetIcon className="w-5 h-5 mr-2 text-green-600" />
+                  Ressources
+                </h2>
+              </div>
+              <div className="p-6">
+                <div className="text-center py-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <p className="font-medium text-blue-900">
+                        {questions.length}
+                      </p>
+                      <p className="text-blue-700">Questions</p>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <p className="font-medium text-green-900">
+                        {resources.length}
+                      </p>
+                      <p className="text-green-700">Ressources</p>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-        {certificates.length > 0 && (
-          <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-              <AwardIcon className="w-5 h-5 mr-2 text-indigo-600" />
-              Certificates Earned
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {certificates.map((certificate) => (
-                <div
-                  key={certificate.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <AwardIcon className="w-8 h-8 text-yellow-500" />
-                    <span className="text-xs text-gray-500">
-                      {new Date(certificate.dateObtention).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-2">
-                    {certificate.formation}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Awarded to {certificate.nomParticipant}
-                  </p>
-                  <button
-                    onClick={() => handleViewCertificate(certificate.id)}
-                    className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:from-indigo-600 hover:to-purple-700 transition-all duration-200"
-                  >
-                    View Certificate
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
-      <CertificateViewModal
-        certificateId={selectedCertificateId}
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        certificates={certificates}
-        handleDownload={handleDownloadCertificate}
-      />
     </div>
   );
 };

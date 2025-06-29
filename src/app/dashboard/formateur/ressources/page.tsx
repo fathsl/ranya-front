@@ -432,6 +432,13 @@ const ResourcesInterface = () => {
     );
   };
 
+  const getFilteredEvaluationTests = (): EvaluationTest[] => {
+    const formationIds = formations.map((formation) => formation.id);
+    return evaluationTests.filter((test) =>
+      formationIds.includes(test.formationId)
+    );
+  };
+
   const getModuleById = (moduleId: string) => {
     return modules.find((module) => module.id === moduleId);
   };
@@ -1327,7 +1334,7 @@ const ResourcesInterface = () => {
       <EvaluationTestsDrawer
         isOpen={evaluationTestsDrawerOpen}
         onClose={() => setEvaluationTestsDrawerOpen(false)}
-        evaluationTests={evaluationTests}
+        evaluationTests={getFilteredEvaluationTests()}
         formations={formations}
         onUpdateTest={updateEvaluationTest}
         onDeleteTest={deleteEvaluationTest}
