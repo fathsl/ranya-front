@@ -232,9 +232,7 @@ const ParticipantsPage = () => {
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Participant
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Niveau
-                  </th>
+                 
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Score
                   </th>
@@ -245,12 +243,7 @@ const ParticipantsPage = () => {
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date Inscription
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Statut Participant
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                 
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -271,15 +264,7 @@ const ParticipantsPage = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getNiveauColor(
-                            participant.niveau
-                          )}`}
-                        >
-                          {participant.niveau}
-                        </span>
-                      </td>
+                    
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1">
                           <TrendingUpIcon className="h-4 w-4 text-blue-500" />
@@ -315,109 +300,6 @@ const ParticipantsPage = () => {
                         <div className="flex items-center gap-1 text-sm text-gray-600">
                           <CalendarIcon className="h-3 w-3" />
                           {formatDate(participant.createdAt)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            participant.isActive
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {participant.isActive ? "Actif" : "Inactif"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {/* Status Update Buttons */}
-                          <div className="flex gap-1">
-                            <button
-                              onClick={() =>
-                                handleUpdateStatus(participant.id, "Inscrit")
-                              }
-                              className={`px-2 py-1 text-xs rounded ${
-                                participant.statusFormation === "Inscrit"
-                                  ? "bg-yellow-200 text-yellow-800"
-                                  : "bg-gray-100 text-gray-600 hover:bg-yellow-100"
-                              }`}
-                              title="Marquer comme Inscrit"
-                            >
-                              Inscrit
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleUpdateStatus(participant.id, "En cours")
-                              }
-                              className={`px-2 py-1 text-xs rounded ${
-                                participant.statusFormation === "En cours"
-                                  ? "bg-blue-200 text-blue-800"
-                                  : "bg-gray-100 text-gray-600 hover:bg-blue-100"
-                              }`}
-                              title="Marquer comme En cours"
-                            >
-                              En cours
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleUpdateStatus(participant.id, "Terminé")
-                              }
-                              className={`px-2 py-1 text-xs rounded ${
-                                participant.statusFormation === "Terminé"
-                                  ? "bg-green-200 text-green-800"
-                                  : "bg-gray-100 text-gray-600 hover:bg-green-100"
-                              }`}
-                              title="Marquer comme Terminé"
-                            >
-                              Terminé
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleUpdateStatus(participant.id, "Annulé")
-                              }
-                              className={`px-2 py-1 text-xs rounded ${
-                                participant.statusFormation === "Annulé"
-                                  ? "bg-red-200 text-red-800"
-                                  : "bg-gray-100 text-gray-600 hover:bg-red-100"
-                              }`}
-                              title="Marquer comme Annulé"
-                            >
-                              Annulé
-                            </button>
-                          </div>
-
-                          <div className="w-px h-6 bg-gray-300"></div>
-
-                          <button
-                            onClick={() =>
-                              handleToggleActive(
-                                participant.id,
-                                participant.isActive
-                              )
-                            }
-                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                              participant.isActive
-                                ? "bg-green-100 text-green-700 hover:bg-green-200"
-                                : "bg-red-100 text-red-700 hover:bg-red-200"
-                            }`}
-                            title={
-                              participant.isActive
-                                ? "Désactiver l'accès"
-                                : "Activer l'accès"
-                            }
-                          >
-                            {participant.isActive ? (
-                              <>
-                                <EyeIcon className="h-4 w-4" />
-                                Activer
-                              </>
-                            ) : (
-                              <>
-                                <EyeOffIcon className="h-4 w-4" />
-                                Désactiver
-                              </>
-                            )}
-                          </button>
                         </div>
                       </td>
                     </tr>

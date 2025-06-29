@@ -349,44 +349,7 @@ const FormationDetailsParticipant = () => {
     const isExpanded = expandedResources.has(resource.id);
     if (!isExpanded) return null;
 
-    const CompletionToggle = () => (
-      <div className="flex items-center gap-2 mb-3">
-        <button
-          onClick={async () => {
-            const newCompletionState = !resource.isCompleted;
-
-            try {
-              await updateResourceCompletion(resource.id, newCompletionState);
-
-              onToggleCompletion?.(resource.id, newCompletionState);
-
-              setTimeout(() => {
-                checkAllResourcesCompleted();
-              }, 100);
-            } catch (error) {
-              console.error("Failed to toggle completion:", error);
-            }
-          }}
-          className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-            resource.isCompleted
-              ? "bg-green-100 text-green-800 hover:bg-green-200"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          }`}
-        >
-          {resource.isCompleted ? (
-            <>
-              <CheckIcon size={16} />
-              Terminé
-            </>
-          ) : (
-            <>
-              <CircleIcon size={16} />
-              Marquer comme terminé
-            </>
-          )}
-        </button>
-      </div>
-    );
+    
     // Helper function to get file extension
     const getFileExtension = (filename: string) => {
       return filename.split(".").pop()?.toLowerCase() || "";
@@ -427,7 +390,7 @@ const FormationDetailsParticipant = () => {
                 </span>
               )}
             </div>
-            <CompletionToggle />
+           
             <div className="flex justify-center">
               {resource.previewUrl || resource.url ? (
                 <img
@@ -472,7 +435,7 @@ const FormationDetailsParticipant = () => {
                 </span>
               )}
             </div>
-            <CompletionToggle />
+           
             {resource.url || resource.previewUrl ? (
               isYouTubeUrl(resource.url) ? (
                 <div
@@ -533,7 +496,7 @@ const FormationDetailsParticipant = () => {
                 </span>
               )}
             </div>
-            <CompletionToggle />
+           
             {resource.url || resource.previewUrl ? (
               <>
                 <div
@@ -584,7 +547,7 @@ const FormationDetailsParticipant = () => {
                 )}
               </div>
             </div>
-            <CompletionToggle />
+           
 
             {resource.content ? (
               <div
@@ -650,7 +613,7 @@ const FormationDetailsParticipant = () => {
                 </span>
               )}
             </div>
-            <CompletionToggle />
+           
             {resource.tableData &&
             resource.tableData.headers &&
             resource.tableData.data ? (
@@ -703,7 +666,7 @@ const FormationDetailsParticipant = () => {
       default:
         return (
           <div className="mt-3 p-4 bg-gray-50 rounded-lg border">
-            <CompletionToggle />
+           
             <p className="text-gray-600 text-center">
               Type de ressource non pris en charge: {resource.type}
             </p>
@@ -892,29 +855,7 @@ const FormationDetailsParticipant = () => {
                               <h4 className="font-medium text-gray-700">
                                 Ressources du module:
                               </h4>
-                              <div className="flex items-center gap-4">
-                                {/* Progress indicator */}
-                                <div className="text-sm text-gray-600">
-                                  {
-                                    module.resources.filter(
-                                      (r) => r.isCompleted
-                                    ).length
-                                  }{" "}
-                                  / {module.resources.length} terminé(s)
-                                </div>
-                                {/* Score display */}
-                                {moduleQuizScores[module.id] && (
-                                  <div
-                                    className={`text-sm font-medium px-2 py-1 rounded ${
-                                      moduleQuizScores[module.id] >= 97
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-yellow-100 text-yellow-800"
-                                    }`}
-                                  >
-                                    Score: {moduleQuizScores[module.id]}%
-                                  </div>
-                                )}
-                              </div>
+                              
                             </div>
                             <div className="space-y-3">
                               {module.resources
