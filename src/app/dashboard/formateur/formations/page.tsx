@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/contexts/authContext";
 import {
   BookOpenIcon,
   Edit3Icon,
@@ -54,6 +55,7 @@ export interface Formation {
 
 const Formations = () => {
   const [formations, setFormations] = useState<Formation[]>([]);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -75,7 +77,24 @@ const Formations = () => {
         }
 
         const data = await response.json();
-        setFormations(data);
+
+        const userFormations = data.filter(
+          (formation: Formation) => formation.userId === user?.id
+        );
+
+        const publicFormations = data.filter(
+          (formation: Formation) => formation.accessType
+        );
+
+        if (user?.role === "admin") {
+          setFormations(data);
+        }
+
+        if (user?.role === "formateur") {
+          setFormations(userFormations);
+        } else {
+          setFormations(publicFormations);
+        }
       } catch (error: any) {
         setError(error.message || "Unknown error");
         console.error("Error fetching formations:", error);
@@ -85,7 +104,7 @@ const Formations = () => {
     };
 
     fetchFormations();
-  }, []);
+  }, [user]);
 
   const handleEdit = (formationId: string) => {
     router.push(`/dashboard/formateur/formations/edit/${formationId}`);

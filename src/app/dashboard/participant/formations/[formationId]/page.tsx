@@ -1,4 +1,5 @@
 "use client";
+import ImagePreviewModal from "@/components/ImagePreviewModal";
 import QuizComponent from "@/components/QuizComponent";
 import { useAuth } from "@/contexts/authContext";
 import {
@@ -114,6 +115,7 @@ const FormationDetailsParticipant = () => {
     null
   );
   const [showQuiz, setShowQuiz] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const getImageUrl = (imageName: string | null | undefined) => {
     if (!imageName) return null;
@@ -316,16 +318,30 @@ const FormationDetailsParticipant = () => {
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorMessage;
-        } catch {
-          // If response is not JSON, use default message
-        }
+        } catch {}
         throw new Error(errorMessage);
       }
 
       const updatedResource = await response.json();
 
-      // Update local state or refetch data
-      // You might want to update your resources state here
+      setFormation((prevFormation) => {
+        if (!prevFormation) return prevFormation;
+
+        const updatedFormation = {
+          ...prevFormation,
+          modules: prevFormation.modules.map((module) => ({
+            ...module,
+            resources: module.resources?.map((resource) =>
+              resource.id === resourceId
+                ? { ...resource, isCompleted }
+                : resource
+            ),
+          })),
+        };
+
+        return updatedFormation;
+      });
+
       checkAllResourcesCompleted();
 
       return updatedResource;
@@ -342,7 +358,6 @@ const FormationDetailsParticipant = () => {
     let allScoresPassing = true;
 
     formation.modules.forEach((module) => {
-      // Check if all resources in this module are completed
       if (module.resources) {
         const moduleResourcesCompleted = module.resources.every(
           (resource) => resource.isCompleted
@@ -352,7 +367,6 @@ const FormationDetailsParticipant = () => {
         }
       }
 
-      // Check if module quiz score is above 97%
       const moduleScore = moduleQuizScores[module.id] || 0;
       if (moduleScore < 97) {
         allScoresPassing = false;
@@ -369,7 +383,6 @@ const FormationDetailsParticipant = () => {
         [moduleId]: score,
       };
 
-      // Use setTimeout to ensure state update is complete before checking
       setTimeout(() => {
         checkAllResourcesCompleted();
       }, 0);
@@ -378,13 +391,11 @@ const FormationDetailsParticipant = () => {
     });
   };
 
-  // Function to open quiz for a module
   const openQuiz = (moduleId: string) => {
     setCurrentQuizModuleId(moduleId);
     setShowQuiz(true);
   };
 
-  // Function to close quiz
   const closeQuiz = () => {
     setShowQuiz(false);
     setCurrentQuizModuleId(null);
@@ -401,17 +412,16 @@ const FormationDetailsParticipant = () => {
       <div className="flex items-center gap-2 mb-3">
         <button
           onClick={async () => {
-            try {
-              await updateResourceCompletion(
-                resource.id,
-                !resource.isCompleted
-              );
-              onToggleCompletion?.(resource.id, !resource.isCompleted);
+            const newCompletionState = !resource.isCompleted;
 
-              // Trigger completion check after updating resource
+            try {
+              await updateResourceCompletion(resource.id, newCompletionState);
+
+              onToggleCompletion?.(resource.id, newCompletionState);
+
               setTimeout(() => {
                 checkAllResourcesCompleted();
-              }, 0);
+              }, 100);
             } catch (error) {
               console.error("Failed to toggle completion:", error);
             }
@@ -480,15 +490,25 @@ const FormationDetailsParticipant = () => {
             <CompletionToggle />
             <div className="flex justify-center">
               {resource.previewUrl || resource.url ? (
-                <img
-                  src={resource.previewUrl || resource.url}
-                  alt={resource.title}
-                  className="max-w-full max-h-96 object-contain rounded-lg shadow-sm border"
-                  onError={(e) => {
-                    e.target.src =
-                      "https://via.placeholder.com/600x400/CCCCCC/666666?text=Image+non+disponible";
-                  }}
-                />
+                <>
+                  <img
+                    src={resource.previewUrl || resource.url}
+                    alt={resource.title}
+                    className="max-w-full max-h-96 object-contain rounded-lg shadow-sm border cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setIsPreviewOpen(true)}
+                    onError={(e) => {
+                      e.target.src =
+                        "https://via.placeholder.com/600x400/CCCCCC/666666?text=Image+non+disponible";
+                    }}
+                  />
+
+                  <ImagePreviewModal
+                    src={resource.previewUrl || resource.url}
+                    alt={resource.title}
+                    isOpen={isPreviewOpen}
+                    onClose={() => setIsPreviewOpen(false)}
+                  />
+                </>
               ) : (
                 <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
                   <p className="text-gray-500">Aperçu non disponible</p>

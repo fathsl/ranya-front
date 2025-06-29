@@ -13,6 +13,8 @@ import {
   XCircleIcon,
   FileTextIcon,
   PhoneIcon,
+  ExternalLinkIcon,
+  DownloadIcon,
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
@@ -573,21 +575,41 @@ const UserFormateurInterface = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Lien LinkedIn
-                    </label>
-                    <input
-                      type="url"
-                      value={editData.linkedInLink || ""}
-                      onChange={(e) =>
-                        setEditData((prev) => ({
-                          ...prev,
-                          linkedInLink: e.target.value,
-                        }))
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="https://linkedin.com/in/..."
-                    />
+                    <div className="relative">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Lien LinkedIn
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="url"
+                          value={editData.linkedInLink || ""}
+                          onChange={(e) =>
+                            setEditData((prev) => ({
+                              ...prev,
+                              linkedInLink: e.target.value,
+                            }))
+                          }
+                          className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          placeholder="https://linkedin.com/in/..."
+                        />
+                        {editData.linkedInLink && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              window.open(
+                                editData.linkedInLink,
+                                "_blank",
+                                "noopener,noreferrer"
+                              )
+                            }
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="Ouvrir le lien LinkedIn"
+                          >
+                            <ExternalLinkIcon size={18} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -658,14 +680,27 @@ const UserFormateurInterface = () => {
                       <span className="text-sm text-gray-600">
                         CV disponible
                       </span>
-                      <a
-                        href={selectedUser.cv}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
-                        Voir le CV
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`/CVs/${selectedUser.cv}`}
+                          download
+                          className="flex items-center gap-1 text-green-600 hover:text-green-800 text-sm font-medium transition-colors"
+                          title="Télécharger le CV"
+                        >
+                          <DownloadIcon size={16} />
+                          Télécharger
+                        </a>
+                        <a
+                          href={`/CVs/${selectedUser.cv}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
+                          title="Ouvrir le CV dans un nouvel onglet"
+                        >
+                          <ExternalLinkIcon size={16} />
+                          Voir le CV
+                        </a>
+                      </div>
                     </div>
                   </div>
                 )}

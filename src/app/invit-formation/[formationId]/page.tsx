@@ -353,17 +353,16 @@ const FormationDetailsParticipant = () => {
       <div className="flex items-center gap-2 mb-3">
         <button
           onClick={async () => {
-            try {
-              await updateResourceCompletion(
-                resource.id,
-                !resource.isCompleted
-              );
-              onToggleCompletion?.(resource.id, !resource.isCompleted);
+            const newCompletionState = !resource.isCompleted;
 
-              // Trigger completion check after updating resource
+            try {
+              await updateResourceCompletion(resource.id, newCompletionState);
+
+              onToggleCompletion?.(resource.id, newCompletionState);
+
               setTimeout(() => {
                 checkAllResourcesCompleted();
-              }, 0);
+              }, 100);
             } catch (error) {
               console.error("Failed to toggle completion:", error);
             }
@@ -388,7 +387,6 @@ const FormationDetailsParticipant = () => {
         </button>
       </div>
     );
-
     // Helper function to get file extension
     const getFileExtension = (filename: string) => {
       return filename.split(".").pop()?.toLowerCase() || "";
@@ -980,7 +978,7 @@ const FormationDetailsParticipant = () => {
                                   </div>
                                 ))}
 
-                              <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
+                              {/* <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-3">
                                     <FileQuestionIcon
@@ -1003,7 +1001,7 @@ const FormationDetailsParticipant = () => {
                                     Commencer le quiz
                                   </button>
                                 </div>
-                              </div>
+                              </div> */}
                             </div>
                           </div>
                         )}

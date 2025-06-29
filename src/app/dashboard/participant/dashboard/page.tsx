@@ -15,10 +15,29 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+interface Resource {
+  id: string;
+  title: string;
+  type: string;
+  videoLink?: string;
+  pdfLink?: string;
+  textLink?: string;
+  content?: string;
+  duration?: number;
+  isCompleted: boolean;
+  thumbnail?: string;
+  description?: string;
+  moduleId: string;
+  module: Module;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface Module {
   id: string;
   titre?: string;
   name?: string;
+  resources: Resource[];
 }
 
 interface User {
@@ -143,12 +162,19 @@ const ParticipantDashboard = () => {
   }, [user?.id]);
 
   const calculateProgress = (formation: Formation) => {
-    const completedModules = Math.floor(
-      Math.random() * formation.modules.length
-    );
-    return formation.modules.length > 0
-      ? (completedModules / formation.modules.length) * 100
-      : 0;
+    if (!formation.modules || formation.modules.length === 0) {
+      return 0;
+    }
+
+    const completedModules = formation.modules.filter((module) => {
+      if (!module.resources || module.resources.length === 0) {
+        return true;
+      }
+
+      return module.resources.every((resource) => resource.isCompleted);
+    }).length;
+
+    return (completedModules / formation.modules.length) * 100;
   };
 
   const getOverallStats = () => {

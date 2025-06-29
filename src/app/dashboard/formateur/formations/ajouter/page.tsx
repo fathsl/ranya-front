@@ -1788,8 +1788,7 @@ const FormationCreator = ({
     let finalLink = invitationData.invitationLink;
     if (!finalLink) {
       const expirationTime = Date.now() + 2 * 24 * 60 * 60 * 1000;
-      const linkId = Math.random().toString(36).substring(2, 15);
-      finalLink = `${window.location.origin}/join-formation?token=${linkId}&expires=${expirationTime}`;
+      finalLink = `http://localhost:3000/invit-formation/${currentFormationId}?expires=${expirationTime}`;
 
       setInvitationData((prev) => ({
         ...prev,
@@ -1865,9 +1864,8 @@ const FormationCreator = ({
   };
 
   const generateLink = () => {
-    const linkId = Math.random().toString(36).substring(2, 15);
     const expirationTime = Date.now() + 2 * 24 * 60 * 60 * 1000;
-    const generatedLink = `http://localhost:3000/invit-formation/${linkId}?expires=${expirationTime}`;
+    const generatedLink = `http://localhost:3000/invit-formation/${currentFormationId}?expires=${expirationTime}`;
 
     setInvitationData((prev) => ({
       ...prev,

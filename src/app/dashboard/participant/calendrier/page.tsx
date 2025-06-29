@@ -66,7 +66,6 @@ const FormationCalendar = () => {
     null
   );
   const [isReminderDrawerOpen, setIsReminderDrawerOpen] = useState(false);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formations, setFormations] = useState<Formation[]>([]);
   const [filteredFormations, setFilteredFormations] = useState<Formation[]>([]);
@@ -95,9 +94,6 @@ const FormationCalendar = () => {
         const data = await response.json();
 
         const filteredFormations = data.filter((formation: Formation) => {
-          if (formation.archived) return false;
-
-          if (formation.accessType === "public") return true;
 
           if (formation.userId === user?.id) return true;
 
@@ -115,7 +111,7 @@ const FormationCalendar = () => {
     };
 
     fetchFormations();
-  }, [user?.id]);
+  }, [user]);
 
   useEffect(() => {
     const filtered = formations.filter(

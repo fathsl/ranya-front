@@ -10,8 +10,6 @@ import {
   Formation,
   MonthlyData,
   TopUser,
-  useCertificates,
-  useInvitations,
   UserStats,
 } from "@/help/help";
 import {
@@ -39,8 +37,8 @@ import {
 
 const Dashboard = () => {
   const [formations, setFormations] = useState<Formation[]>([]);
-  const { certificates } = useCertificates();
-  const { invitations } = useInvitations();
+  const [certificates, setCertificates] = useState(0);
+  const [invitations, setInvitations] = useState(0);
   const { user } = useAuth();
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [userStats, setUserStats] = useState<UserStats>({
@@ -80,6 +78,64 @@ const Dashboard = () => {
         const userFormations = allFormations.filter(
           (formation: Formation) => formation.userId === user.id
         );
+
+        const certificatesResponse = await fetch(
+          "http://127.0.0.1:3001/certificats",
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!certificatesResponse.ok) {
+          throw new Error(`HTTP error! status: ${certificatesResponse.status}`);
+        }
+
+        const certificatesData = await certificatesResponse.json();
+
+        const formationIds = userFormations.map(
+          (formation: Formation) => formation.id
+        );
+
+        const matchingCertificates = certificatesData.filter(
+          (certificate: any) => formationIds.includes(certificate.formationId)
+        );
+
+        const certificatesCount = Array.isArray(matchingCertificates)
+          ? matchingCertificates.length
+          : matchingCertificates.certificates?.length ||
+            matchingCertificates.certificats?.length ||
+            0;
+
+        setCertificates(certificatesCount);
+
+        const invitationsResponse = await fetch(
+          `http://127.0.0.1:3001/invitations`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!invitationsResponse.ok) {
+          throw new Error(`HTTP error! status: ${invitationsResponse.status}`);
+        }
+
+        const invitationData = await invitationsResponse.json();
+
+        const matchingInvitations = invitationData.filter((invitation: any) =>
+          formationIds.includes(invitation.formationId)
+        );
+
+        const invitationsCount = Array.isArray(matchingInvitations)
+          ? matchingInvitations.length
+          : matchingInvitations.invitations?.length || 0;
+
+        setInvitations(invitationsCount);
 
         return userFormations;
       } catch (error) {

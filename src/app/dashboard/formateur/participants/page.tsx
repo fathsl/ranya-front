@@ -7,7 +7,6 @@ import {
   Edit3Icon,
   MailIcon,
   PhoneIcon,
-  PlusIcon,
   SaveIcon,
   SearchIcon,
   SquareArrowOutUpRight,
@@ -15,6 +14,8 @@ import {
   UserIcon,
   XIcon,
 } from "lucide-react";
+import { useAuth } from "@/contexts/authContext";
+import { Formation } from "@/help/help";
 
 interface User {
   id: string;
@@ -27,12 +28,6 @@ interface User {
   formations?: Formation[];
   createdAt: string;
   updatedAt: string;
-}
-
-interface Formation {
-  id: string;
-  titre: string;
-  completed: boolean;
 }
 
 interface EditUserData {
@@ -50,6 +45,7 @@ const ParticipantInterface = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedFormation, setSelectedFormation] = useState<string>("");
   const [formations, setFormations] = useState<Formation[]>([]);
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editData, setEditData] = useState<EditUserData>({
@@ -86,7 +82,18 @@ const ParticipantInterface = () => {
         }
 
         const data = await response.json();
-        setFormations(data);
+
+        const userFormations = data.filter(
+          (formation: Formation) => formation.userId === user?.id
+        );
+
+        if (user?.role === "admin") {
+          setFormations(data);
+        }
+
+        if (user?.role === "formateur") {
+          setFormations(userFormations);
+        }
       } catch (error: any) {
         setError(error.message || "Unknown error");
         console.error("Error fetching formations:", error);
@@ -96,7 +103,7 @@ const ParticipantInterface = () => {
     };
 
     fetchFormations();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchUsers();
@@ -190,13 +197,10 @@ const ParticipantInterface = () => {
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorMessage;
-        } catch {
-          // If response is not JSON, use default message
-        }
+        } catch {}
         throw new Error(errorMessage);
       }
 
-      // Backend returns the deleted user object, but we just need to remove from state
       setUsers((prev) => prev.filter((u) => u.id !== id));
       setShowDeleteConfirm(null);
     } catch (error) {
@@ -208,14 +212,12 @@ const ParticipantInterface = () => {
   };
 
   const filteredUsers = users.filter((user) => {
-    // Existing search logic
     const matchesSearch =
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (user.telephone &&
         user.telephone.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    // Formation filter logic
     const matchesFormation =
       !selectedFormation ||
       (user.formations &&
@@ -252,21 +254,13 @@ const ParticipantInterface = () => {
   };
 
   const handleGenerateCertificate = async (user: User) => {
-    console.log("User object:", user); // Debug log
-    console.log("User formations:", user.formations); // Debug log
-
-    // Validate user has formations
     if (!user.formations || user.formations.length === 0) {
       alert("L'utilisateur n'a pas de formations associées");
       return;
     }
 
-    // Get the first formation (you might want to let user choose)
     const formation = user.formations[0];
 
-    console.log("Selected formation:", formation); // Debug log
-
-    // More detailed validation
     if (!formation) {
       alert("Aucune formation trouvée pour cet utilisateur");
       return;
@@ -363,12 +357,12 @@ const ParticipantInterface = () => {
                 Gérez les utilisateurs participants et leurs informations
               </p>
             </div>
-            <Link href={"/dashboard/formateur/participants/ajouter"}>
+            {/* <Link href={"/dashboard/formateur/participants/ajouter"}>
               <button className="flex flex-row bg-blue-600 text-white px-6 py-2 rounded-md space-x-2">
                 <PlusIcon />
                 <span className="text-l font-bold">Ajouter</span>
               </button>
-            </Link>
+            </Link> */}
           </div>
 
           <div className="flex space-x-4 mb-6">

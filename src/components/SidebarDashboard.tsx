@@ -99,7 +99,7 @@ const Sidebar = () => {
       id: "participants",
       label: "Participants",
       icon: GraduationCapIcon,
-      href: "/dashboard/admin/participants",
+      href: "/dashboard/formateur/participants",
     },
   ];
 

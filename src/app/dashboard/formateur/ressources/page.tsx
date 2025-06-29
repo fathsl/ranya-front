@@ -1,6 +1,8 @@
 "use client";
 
 import EvaluationTestsDrawer from "@/components/EvaluationTestsDrawer";
+import { useAuth } from "@/contexts/authContext";
+import { Formation } from "@/help/help";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -133,7 +135,7 @@ const ResourcesInterface = () => {
   >({});
   const [, setLoadingQuizzes] = useState<Record<string, boolean>>({});
   const [evaluationTests, setEvaluationTests] = useState<EvaluationTest[]>([]);
-
+  const { user } = useAuth();
   const [editData, setEditData] = useState<EditResourceData>({
     title: "",
     type: "video",
@@ -188,7 +190,18 @@ const ResourcesInterface = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setFormations(data);
+
+        const userFormations = data.filter(
+          (formation: Formation) => formation.userId === user?.id
+        );
+
+        if (user?.role === "admin") {
+          setFormations(data);
+        }
+
+        if (user?.role === "formateur") {
+          setFormations(userFormations);
+        }
       }
     } catch (error) {
       console.error("Error fetching formations:", error);
@@ -395,7 +408,7 @@ const ResourcesInterface = () => {
     };
 
     initializeData();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (modules.length > 0) {
