@@ -3057,7 +3057,7 @@ const FormationCreator = ({
                               Multiple Choice
                             </option>
                             <option value="true-false">True/False</option>
-                            <option value="short-answer">Short Answer</option>
+                            {/* <option value="short-answer">Short Answer</option> */}
                           </select>
                         </div>
                         <div>
