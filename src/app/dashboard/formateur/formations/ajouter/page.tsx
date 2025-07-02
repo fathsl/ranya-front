@@ -3349,7 +3349,7 @@ const FormationCreator = ({
                         label: "Email Invites",
                       },
                       { value: "link", icon: Link2Icon, label: "Invite Link" },
-                      { value: "csv", icon: FileTextIcon, label: "CSV Upload" },
+                      // { value: "csv", icon: FileTextIcon, label: "CSV Upload" },
                     ].map((option) => (
                       <label
                         key={option.value}

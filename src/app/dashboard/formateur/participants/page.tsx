@@ -106,29 +106,46 @@ const ParticipantInterface = () => {
   }, [user]);
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch(
+          "http://127.0.0.1:3001/users?role=participant",
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch(
-        "http://127.0.0.1:3001/users?role=participant",
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
+        if (!response.ok) {
+          throw new Error("Failed to fetch users");
         }
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch users");
+
+        const data = await response.json();
+
+        // Filter users who have formations where formation.userId === user.id
+        const relevantFormationIds = formations
+          .filter((formation) => formation.userId === user?.id)
+          .map((formation) => formation.id);
+
+        const filteredUsers = data.filter((u: User) =>
+          u.formations?.some((formation) =>
+            relevantFormationIds.includes(formation.id)
+          )
+        );
+
+        setUsers(filteredUsers);
+      } catch (error) {
+        console.error("Error fetching users:", error);
       }
-      const data = await response.json();
-      setUsers(data);
-    } catch (error) {
-      console.error("Error fetching users:", error);
+    };
+
+    // Only fetch users after formations are loaded
+    if (formations.length > 0 || user?.role === "admin") {
+      fetchUsers();
     }
-  };
+  }, [formations, user]);
 
   const handleEdit = (user: User) => {
     setSelectedUser(user);

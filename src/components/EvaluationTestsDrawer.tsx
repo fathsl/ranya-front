@@ -1024,12 +1024,12 @@ const EvaluationTestsDrawer: React.FC<EvaluationTestsDrawerProps> = ({
                             <h4 className="text-md font-medium text-gray-900">
                               Questions du test
                             </h4>
-                            <button
+                            {/* <button
                               onClick={() => setCreatingQuestion(test.id!)}
                               className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
                             >
                               Ajouter une question
-                            </button>
+                            </button> */}
                           </div>
 
                           {creatingQuestion === test.id &&

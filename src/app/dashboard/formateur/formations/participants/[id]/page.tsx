@@ -232,10 +232,6 @@ const ParticipantsPage = () => {
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Participant
                   </th>
-                 
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Score
-                  </th>
 
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Certificat
@@ -243,7 +239,6 @@ const ParticipantsPage = () => {
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date Inscription
                   </th>
-                 
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -262,15 +257,6 @@ const ParticipantsPage = () => {
                             <MailIcon className="h-3 w-3" />
                             {participant.email}
                           </div>
-                        </div>
-                      </td>
-                    
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1">
-                          <TrendingUpIcon className="h-4 w-4 text-blue-500" />
-                          <span className="text-sm font-medium text-gray-900">
-                            {formatScore(participant.score)}%
-                          </span>
                         </div>
                       </td>
 

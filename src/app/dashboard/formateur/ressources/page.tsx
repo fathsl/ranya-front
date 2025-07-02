@@ -33,6 +33,10 @@ interface ResourceEntity {
   isCompleted: boolean;
   thumbnail?: string;
   description?: string;
+  tableData?: {
+    headers: string[];
+    data: string[][];
+  };
   moduleId: string;
   module: ModuleEntity;
   createdAt: string;
@@ -46,6 +50,9 @@ interface ModuleEntity {
   formationId: string;
   duration?: number;
   order: number;
+  url?: string;
+
+  fileName?: string;
   formation: FormationEntity;
   resources: ResourceEntity[];
   createdAt: string;
@@ -116,6 +123,15 @@ interface EditResourceData {
   isCompleted: boolean;
   thumbnail: string;
   description: string;
+  fileName?: string;
+  fileSize?: number;
+  previewUrl?: string;
+  url: string;
+  file?: File | null;
+  tableData?: {
+    headers: string[];
+    data: string[][];
+  };
   moduleId: string;
 }
 
@@ -1091,7 +1107,7 @@ const ResourcesInterface = () => {
                                 </td>
                                 <td className="py-3 px-6">
                                   <div className="flex items-center gap-2 text-gray-600">
-                                    <ClockIcon size={14} />
+                                    {/* <ClockIcon size={14} />
                                     <span className="text-sm">
                                       {formatDuration(
                                         moduleResources.reduce(
@@ -1099,7 +1115,7 @@ const ResourcesInterface = () => {
                                           0
                                         )
                                       )}
-                                    </span>
+                                    </span> */}
                                   </div>
                                 </td>
                                 <td className="py-3 px-6">
@@ -1166,10 +1182,10 @@ const ResourcesInterface = () => {
                                   </td>
                                   <td className="py-3 px-6">
                                     <div className="flex items-center gap-2 text-gray-600">
-                                      <ClockIcon size={14} />
+                                      {/* <ClockIcon size={14} />
                                       <span className="text-sm">
                                         {formatDuration(resource.duration)}
-                                      </span>
+                                      </span> */}
                                     </div>
                                   </td>
                                   <td className="py-3 px-6">
@@ -1692,8 +1708,10 @@ const ResourcesInterface = () => {
                     >
                       <option value="video">Vidéo</option>
                       <option value="pdf">PDF</option>
+                      <option value="document">Document</option>
+                      <option value="image">Image</option>
                       <option value="text">Texte</option>
-                      <option value="link">Lien</option>
+                      <option value="table">Tableau</option>
                     </select>
                   </div>
 
@@ -1756,25 +1774,23 @@ const ResourcesInterface = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Durée (minutes)
-                      </label>
-                      <input
-                        type="number"
-                        value={editData.duration}
-                        onChange={(e) =>
-                          setEditData((prev) => ({
-                            ...prev,
-                            duration: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="0"
-                        min="0"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Durée (minutes)
+                    </label>
+                    <input
+                      type="number"
+                      value={editData.duration}
+                      onChange={(e) =>
+                        setEditData((prev) => ({
+                          ...prev,
+                          duration: parseInt(e.target.value) || 0,
+                        }))
+                      }
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="0"
+                      min="0"
+                    />
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -1798,66 +1814,71 @@ const ResourcesInterface = () => {
                     </label>
                   </div>
 
-                  {editData.type === "video" && (
+                  {(editData.type === "video" ||
+                    editData.type === "pdf" ||
+                    editData.type === "document" ||
+                    editData.type === "image") && (
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Lien vidéo
+                        {editData.type === "video" && "Fichier vidéo"}
+                        {editData.type === "pdf" && "Fichier PDF"}
+                        {editData.type === "document" && "Document"}
+                        {editData.type === "image" && "Fichier image"}
                       </label>
+
+                      {editData.url && (
+                        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <span>📎</span>
+                            <span>
+                              Fichier actuel:{" "}
+                              {editData.fileName || "Fichier existant"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* File input */}
                       <input
-                        type="url"
-                        value={editData.videoLink}
-                        onChange={(e) =>
-                          setEditData((prev) => ({
-                            ...prev,
-                            videoLink: e.target.value,
-                          }))
+                        type="file"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setEditData((prev) => ({
+                              ...prev,
+                              file: file,
+                              fileName: file.name,
+                              fileSize: file.size,
+                            }));
+                          }
+                        }}
+                        accept={
+                          editData.type === "video"
+                            ? "video/*"
+                            : editData.type === "pdf"
+                            ? ".pdf"
+                            : editData.type === "image"
+                            ? "image/*"
+                            : "*"
                         }
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="https://..."
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                       />
+
+                      {editData.file && (
+                        <div className="mt-2 p-2 bg-green-50 rounded-lg">
+                          <div className="text-sm text-green-800">
+                            ✓ Nouveau fichier sélectionné: {editData.file.name}
+                          </div>
+                          <div className="text-xs text-green-600">
+                            Taille:{" "}
+                            {(editData.file.size / 1024 / 1024).toFixed(2)} MB
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {editData.type === "pdf" && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Lien PDF
-                      </label>
-                      <input
-                        type="url"
-                        value={editData.pdfLink}
-                        onChange={(e) =>
-                          setEditData((prev) => ({
-                            ...prev,
-                            pdfLink: e.target.value,
-                          }))
-                        }
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="https://..."
-                      />
-                    </div>
-                  )}
-
-                  {editData.type === "link" && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Lien externe
-                      </label>
-                      <input
-                        type="url"
-                        value={editData.textLink}
-                        onChange={(e) =>
-                          setEditData((prev) => ({
-                            ...prev,
-                            textLink: e.target.value,
-                          }))
-                        }
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                        placeholder="https://..."
-                      />
-                    </div>
-                  )}
-
+                  {/* Text Content Section */}
                   {editData.type === "text" && (
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1875,6 +1896,69 @@ const ResourcesInterface = () => {
                         placeholder="Contenu de la ressource..."
                         rows={5}
                       />
+                    </div>
+                  )}
+
+                  {/* Table Data Section */}
+                  {editData.type === "table" && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Données du tableau
+                      </label>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            En-têtes (séparés par des virgules)
+                          </label>
+                          <input
+                            type="text"
+                            value={
+                              editData.tableData?.headers?.join(", ") || ""
+                            }
+                            onChange={(e) => {
+                              const headers = e.target.value
+                                .split(",")
+                                .map((h) => h.trim());
+                              setEditData((prev) => ({
+                                ...prev,
+                                tableData: {
+                                  headers: headers,
+                                  data: prev.tableData?.data || [],
+                                },
+                              }));
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                            placeholder="Nom, Age, Email, Ville"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Données (JSON format)
+                          </label>
+                          <textarea
+                            value={JSON.stringify(
+                              editData.tableData?.data || [],
+                              null,
+                              2
+                            )}
+                            onChange={(e) => {
+                              const headers = e.target.value
+                                .split(",")
+                                .map((h) => h.trim());
+                              setEditData((prev) => ({
+                                ...prev,
+                                tableData: {
+                                  headers: headers,
+                                  data: prev.tableData?.data || [],
+                                },
+                              }));
+                            }}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-mono"
+                            placeholder='[{"nom": "John", "age": "25", "email": "john@email.com"}]'
+                            rows={4}
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
 
